@@ -1,14 +1,34 @@
-# civicdesigncenter 
+# Civic Design Center - City Settler project
 
-City Settlers multiplayer city simulation rebuilt with a modern stack and implementing modularity, primarily as a Nashville based game for youth, then as a platform educators can customize for their own cities and classrooms.
+City Settlers is a multiplayer city simulation for youth and classrooms. Small
+teams share a map, place buildings on a grid, bid for them in auctions, trade
+resources, and balance money against pollution, population, and happiness.
 
-Small teams of 2 to 5 players each run a city on a shared map. They place buildings on a grid, win them through an auction, trade resources, and balance money against pollution, population, and happiness. A room holds 20 to 30 players, and the game ends when the admin ends or resources run out. 
+The first target is a Nashville-based game. Over time, the platform can support
+educators customizing the experience for their own cities and classrooms.
 
+## Frontend
 
-# Quickstart
+The frontend uses React and Vite. The backend is not part of this setup yet;
+its stack will be decided separately.
 
+### Requirements
+
+- Node.js 20.19+ or 22.12+
+- npm
+
+### Quickstart
+
+```sh
+npm install
 npm run dev
+```
 
+Vite prints the local development URL in the terminal.
 
-# Stack
-React+Meteor (tbd)
+### Scripts
+
+- `npm run dev` — start the development server
+- `npm run build` — create a production build in `dist/`
+- `npm run preview` — serve the production build locally
+- `npm run lint` — lint the frontend source
