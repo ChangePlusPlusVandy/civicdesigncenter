@@ -35,7 +35,7 @@ Vite prints the local development URL in the terminal.
 
 ## References 
 [demo slides](https://docs.google.com/presentation/d/1kzFn_MSI3Mv6gJWVl5zjCtrD4eseWc2_JONAXiQr5dg/edit?slide=id.g3849aa00bc5_0_0#slide=id.g3849aa00bc5_0_0)
-[demo video](https://drive.google.com/file/d/1D0ah9Z9wWJuTSE8RJOlgAU1nLr4a_HLn/view)
-[previous github](https://github.com/Visheshk/LC2)
-[previous hosted app](https://citysettlers.visheshk.net/)
-[research paper](https://web.archive.org/web/20260309142333/https://www.pixelplaygrounds.org/citysettlers)
+| [demo video](https://drive.google.com/file/d/1D0ah9Z9wWJuTSE8RJOlgAU1nLr4a_HLn/view)
+| [previous github](https://github.com/Visheshk/LC2)
+| [previous hosted app](https://citysettlers.visheshk.net/)
+| [research paper](https://web.archive.org/web/20260309142333/https://www.pixelplaygrounds.org/citysettlers)
