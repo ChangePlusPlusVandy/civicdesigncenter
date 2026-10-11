@@ -1,20 +1,23 @@
 ---
 name: Pull request template
 about: Template for issue pull requests
-title: ''
-labels: ''
-assignees: ''
-
+title: ""
+labels: ""
+assignees: ""
 ---
 
 #Summary
-* Summary of the pr
+
+- Summary of the pr
 
 #linked issue
-* \*Related issue 
+
+- \*Related issue
 
 #Checklist
-*  action items
+
+- action items
 
 #Tests
-* planned testing
+
+- planned testing

@@ -32,6 +32,8 @@ Vite prints the local development URL in the terminal.
 - `npm run build` — create a production build in `dist/`
 - `npm run preview` — serve the production build locally
 - `npm run lint` — lint the frontend source
+- `npm run format` — run formatting
+- `npm run format:check` — run format check
 
 ## References 
 [demo slides](https://docs.google.com/presentation/d/1kzFn_MSI3Mv6gJWVl5zjCtrD4eseWc2_JONAXiQr5dg/edit?slide=id.g3849aa00bc5_0_0#slide=id.g3849aa00bc5_0_0)
