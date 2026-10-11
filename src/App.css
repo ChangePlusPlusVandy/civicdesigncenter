@@ -70,7 +70,7 @@
 .hero h1 {
   margin: 0;
   color: var(--ink);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(52px, 8.5vw, 98px);
   font-weight: 400;
   letter-spacing: -0.075em;
@@ -125,7 +125,7 @@
 .section-heading h2 {
   margin: 0;
   color: var(--ink);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(24px, 4vw, 34px);
   font-weight: 400;
   letter-spacing: -0.05em;
