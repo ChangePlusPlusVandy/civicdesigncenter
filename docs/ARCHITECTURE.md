@@ -87,24 +87,22 @@ server  auth middleware          -> actor { player | teacher, gameId, teamId }
 
 ## Environments
 
-| Env        | Web                                         | API                 | DB                                         |
-| ---------- | ------------------------------------------- | ------------------- | ------------------------------------------ |
-| Local      | Vite :5173, proxies `/api` and `/socket.io` | :3000               | PGlite in `./.pglite/`, or optional Docker |
-| CI         | —                                           | tests only          | in-memory PGlite                           |
-| PR preview | Vercel (UI review; `VITE_API_URL` optional) | demo server, if any | Neon                                       |
-| Demo       | Served by the server (same origin)          | laptop + tunnel     | Neon                                       |
-| Staging    | Served by the server (same origin)          | Azure VM + tunnel   | Neon                                       |
+| Env        | Web                                         | API                | DB                                         |
+| ---------- | ------------------------------------------- | ------------------ | ------------------------------------------ |
+| Local      | Vite :5173, proxies `/api` and `/socket.io` | :3000              | PGlite in `./.pglite/`, or optional Docker |
+| CI         | —                                           | tests only         | in-memory PGlite                           |
+| PR preview | Vercel (`VITE_API_URL` = staging)           | Azure VM (staging) | Neon                                       |
+| Staging    | Served by the server (same origin)          | Azure VM + Caddy   | Neon                                       |
 
 - **Database:** Neon Postgres is the shared database for demos and staging.
   Local development and CI never touch it.
 - **Migrations:** on push to `main`, after CI passes, GitHub Actions runs
   migrations against Neon (`DATABASE_URL_DIRECT` secret).
-- **Server hosting:** staging runs on a small Azure for Students VM: the
-  server image (built by CI and published to GHCR) plus a Cloudflare named
-  tunnel, with no inbound web ports. See `deploy/azure/README.md`. It moves
-  to the DigitalOcean droplet once access is granted. For quick demos from a
-  laptop: `npm run build && NODE_ENV=production npm start` with
-  `DATABASE_URL` set to Neon, plus `cloudflared tunnel --url http://localhost:3000`.
+- **Server hosting:** staging runs on a small Azure VM: the server image
+  (built by CI and published to GHCR) behind Caddy, which serves HTTPS on the
+  VM's Azure DNS name. See `deploy/azure/README.md`. It moves to the
+  DigitalOcean droplet once access is granted. For local demos:
+  `npm run build && NODE_ENV=production npm start` with `DATABASE_URL` set to Neon.
 - CORS allows only the server's own origin and Vercel preview URLs.
 - Configuration is in `.env.example`. Real values live in GitHub Actions,
   Vercel and the server's environment, never in the repo.

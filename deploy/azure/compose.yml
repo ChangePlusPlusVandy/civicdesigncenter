@@ -1,6 +1,6 @@
-# Staging on the Azure VM: the game server plus a Cloudflare named tunnel.
-# No inbound ports are opened: cloudflared connects out to Cloudflare, and the
-# tunnel's public hostname routes to http://server:3000.
+# Staging on the Azure VM: the game server behind Caddy.
+# Caddy terminates HTTPS on ports 80/443 with an automatic Let's Encrypt
+# certificate for SITE_ADDRESS, and proxies (including WebSockets) to server:3000.
 # Secrets come from /opt/citysettlers/.env on the VM (see README.md here).
 services:
   server:
@@ -11,11 +11,21 @@ services:
       NODE_ENV: production
       PORT: "3000"
 
-  tunnel:
-    image: cloudflare/cloudflared:latest
+  caddy:
+    image: caddy:2
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    ports:
+      - "80:80"
+      - "443:443"
     environment:
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
     depends_on:
       - server
+
+volumes:
+  caddy-data:
+  caddy-config:
