@@ -1,5 +1,0 @@
-# SITE_ADDRESS is the VM's Azure DNS name, e.g. citysettlers.eastus.cloudapp.azure.com
-{$SITE_ADDRESS} {
-	encode gzip
-	reverse_proxy server:3000
-}

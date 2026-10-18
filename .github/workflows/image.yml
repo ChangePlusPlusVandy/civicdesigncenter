@@ -1,7 +1,7 @@
 name: Server image
 
 # Builds the server image on every PR (no push) and publishes it to GHCR on
-# main. The staging VM pulls ghcr.io/changeplusplusvandy/civicdesigncenter:main.
+# main. The droplet (deploy/droplet) will pull ghcr.io/changeplusplusvandy/civicdesigncenter:main.
 
 on:
   pull_request:
