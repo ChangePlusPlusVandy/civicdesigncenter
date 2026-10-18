@@ -1,0 +1,23 @@
+# OPTIONAL. Local development uses PGlite by default and needs no Docker.
+# Use this only if you want a real Postgres server locally:
+#   docker compose up -d db
+#   then set DATABASE_URL in .env (see .env.example)
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: citysettlers
+      POSTGRES_PASSWORD: citysettlers
+      POSTGRES_DB: citysettlers
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U citysettlers -d citysettlers"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:

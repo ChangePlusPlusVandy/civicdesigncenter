@@ -27,15 +27,32 @@ packages/shared/  Types and schemas shared by web and server
   npm 10 can install from the existing lockfile but crashes when resolving
   new packages in this workspace.
 
-### Quickstart
+### Local development (no Docker)
 
 ```sh
 npm install
+cp .env.example .env   # optional; every value has a local default
 npm run dev
 ```
 
 This starts the web client (Vite, http://localhost:5173) and the server
-(http://localhost:3000) together.
+(http://localhost:3000) together. Open the web client; it forwards `/api`
+and `/socket.io` to the server, so there is no CORS setup locally.
+
+The database defaults to [PGlite](https://pglite.dev), an embedded Postgres
+stored in `./.pglite/` (gitignored). Leave `DATABASE_URL` blank to use it.
+Delete `./.pglite/` to reset your local data.
+
+### Optional: Docker Postgres
+
+If you want a real Postgres server instead:
+
+```sh
+docker compose up -d db
+```
+
+Then set `DATABASE_URL=postgres://citysettlers:citysettlers@localhost:5432/citysettlers`
+in `.env`. Stop it with `docker compose down` (add `-v` to delete its data).
 
 ### Scripts
 
