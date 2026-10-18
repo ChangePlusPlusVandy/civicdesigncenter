@@ -68,6 +68,11 @@ Run from the repository root:
 
 To run a script in one workspace, use `-w`, for example `npm run dev -w apps/web`.
 
+## Docs
+
+- [Architecture and tech stack](docs/ARCHITECTURE.md)
+- [Contributing: workflow, reviews, check-ins](CONTRIBUTING.md)
+
 ## References
 
 [demo slides](https://docs.google.com/presentation/d/1kzFn_MSI3Mv6gJWVl5zjCtrD4eseWc2_JONAXiQr5dg/edit?slide=id.g3849aa00bc5_0_0#slide=id.g3849aa00bc5_0_0)
