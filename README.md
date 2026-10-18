@@ -7,15 +7,25 @@ resources, and balance money against pollution, population, and happiness.
 The first target is a Nashville-based game. Over time, the platform can support
 educators customizing the experience for their own cities and classrooms.
 
-## Frontend
+## Project layout
 
-The frontend uses React and Vite. The backend is not part of this setup yet;
-its stack will be decided separately.
+This is an npm workspaces monorepo written in TypeScript.
+
+```
+apps/web/         React + Vite client
+apps/server/      Express game server (serves the built client in production)
+packages/engine/  Pure, deterministic game rules (no I/O)
+packages/shared/  Types and schemas shared by web and server
+```
+
+## Development
 
 ### Requirements
 
 - Node.js 20.19+ or 22.12+
-- npm
+- npm 11 when adding or upgrading dependencies (`npm install -g npm@11`).
+  npm 10 can install from the existing lockfile but crashes when resolving
+  new packages in this workspace.
 
 ### Quickstart
 
@@ -24,16 +34,22 @@ npm install
 npm run dev
 ```
 
-Vite prints the local development URL in the terminal.
+This starts the web client (Vite, http://localhost:5173) and the server
+(http://localhost:3000) together.
 
 ### Scripts
 
-- `npm run dev` — start the development server
-- `npm run build` — create a production build in `dist/`
-- `npm run preview` — serve the production build locally
-- `npm run lint` — lint the frontend source
-- `npm run format` — run formatting
-- `npm run format:check` — run format check
+Run from the repository root:
+
+- `npm run dev` — start the web client and server in watch mode
+- `npm run build` — build the web client, then the server
+- `npm start` — run the built server (set `NODE_ENV=production` to also serve the client)
+- `npm test` — run all tests (Vitest)
+- `npm run typecheck` — type-check every workspace
+- `npm run lint` — lint with oxlint
+- `npm run format` / `npm run format:check` — format with Prettier
+
+To run a script in one workspace, use `-w`, for example `npm run dev -w apps/web`.
 
 ## References
 
