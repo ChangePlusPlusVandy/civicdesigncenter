@@ -7,15 +7,15 @@ facilitator console.
 
 ## Tech stack
 
-| Layer   | Choice                                                                                                          |
-| ------- | --------------------------------------------------------------------------------------------------------------- |
-| Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`                                      |
-| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                                                      |
-| Engine  | Pure TypeScript package: game rules only, no I/O                                                                |
-| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in the cloud                                           |
-| Auth    | Teachers: Better Auth (email + password, Google). Players: a game-scoped token, no account                      |
-| Tests   | Vitest (engine; server integration on in-memory PGlite), Playwright smoke test                                  |
-| Hosting | Neon (Postgres), Vercel (PR previews of the web client), a DigitalOcean droplet for the server (pending access) |
+| Layer   | Choice                                                                                              |
+| ------- | --------------------------------------------------------------------------------------------------- |
+| Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`                          |
+| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                                          |
+| Engine  | Pure TypeScript package: game rules only, no I/O                                                    |
+| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in the cloud                               |
+| Auth    | Teachers: Better Auth (email + password, Google). Players: a game-scoped token, no account          |
+| Tests   | Vitest (engine; server integration on in-memory PGlite), Playwright smoke test                      |
+| Hosting | Neon (Postgres), Vercel (PR previews of the web client), an Azure VM for the server (droplet later) |
 
 ## Repository layout
 
@@ -82,7 +82,7 @@ server  auth middleware          -> actor { player | teacher, gameId, teamId }
   `Authorization` header. Teachers can assign teams, kick, rename, reset a
   seat, and lock the room.
 - **Teachers** sign up with an invite code and log in with email + password or
-  Google. Google sign-in only works on the staging origin (added once the droplet is
+  Google. Google sign-in only works on the staging origin (added once staging is
   live); until then, and on Vercel previews, use email + password. Every teacher action checks `game_roles`.
 
 ## Environments
@@ -93,19 +93,18 @@ server  auth middleware          -> actor { player | teacher, gameId, teamId }
 | CI         | —                                           | tests only          | in-memory PGlite                           |
 | PR preview | Vercel (UI review; `VITE_API_URL` optional) | demo server, if any | Neon                                       |
 | Demo       | Served by the server (same origin)          | laptop + tunnel     | Neon                                       |
-| Staging    | Served by the server (same origin)          | droplet (pending)   | Neon                                       |
+| Staging    | Served by the server (same origin)          | Azure VM + tunnel   | Neon                                       |
 
 - **Database:** Neon Postgres is the shared database for demos and staging.
   Local development and CI never touch it.
 - **Migrations:** on push to `main`, after CI passes, GitHub Actions runs
   migrations against Neon (`DATABASE_URL_DIRECT` secret).
-- **Server hosting:** there is no free cloud host for a long-lived WebSocket
-  server without a card, so the server waits for the DigitalOcean droplet
-  (Docker + Caddy). Until then, demos run from a laptop:
-  `npm run build && NODE_ENV=production npm start` with `DATABASE_URL` set to
-  Neon, exposed with a Cloudflare quick tunnel
-  (`cloudflared tunnel --url http://localhost:3000`). This is for demos only,
-  not classroom sessions.
+- **Server hosting:** staging runs on a small Azure for Students VM: the
+  server image (built by CI and published to GHCR) plus a Cloudflare named
+  tunnel, with no inbound web ports. See `deploy/azure/README.md`. It moves
+  to the DigitalOcean droplet once access is granted. For quick demos from a
+  laptop: `npm run build && NODE_ENV=production npm start` with
+  `DATABASE_URL` set to Neon, plus `cloudflared tunnel --url http://localhost:3000`.
 - CORS allows only the server's own origin and Vercel preview URLs.
 - Configuration is in `.env.example`. Real values live in GitHub Actions,
   Vercel and the server's environment, never in the repo.
