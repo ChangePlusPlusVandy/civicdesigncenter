@@ -1,19 +1,19 @@
 ---
 name: Task
-about: todo
+about: A unit of planned work
 title: ""
 labels: ""
 assignees: ""
 ---
 
-# Description
+## Description
 
-Description of the feature or task needed
+What needs to be done and why.
 
-# Deliverables
+## Deliverables
 
-Summary of what should be implemented
+What "done" looks like.
 
-# Other requirements
+## Other requirements
 
-Misc. details
+Dependencies (`Depends on #N`), suggested role, links.

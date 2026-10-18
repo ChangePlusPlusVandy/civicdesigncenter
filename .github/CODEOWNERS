@@ -1,0 +1,3 @@
+# Until 11/1 the EM reviews every PR. After that this becomes per-area owners
+# (engine rules, auth, sockets, migrations) and other paths need one peer approval.
+* @prisn9
