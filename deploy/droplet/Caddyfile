@@ -1,0 +1,5 @@
+# SITE_ADDRESS is the VM's DNS name, e.g. citysettlers.example.org
+{$SITE_ADDRESS} {
+	encode gzip
+	reverse_proxy server:3000
+}

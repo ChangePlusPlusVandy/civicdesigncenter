@@ -1,0 +1,21 @@
+#cloud-config
+# First-boot setup for the production VM (Ubuntu 24.04). Pass it as user data
+# when creating the droplet. Replace the SSH key with the EM's public key.
+users:
+  - name: deploy
+    groups: [docker]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    ssh_authorized_keys:
+      - ssh-ed25519 REPLACE_WITH_PUBLIC_KEY
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+swap:
+  filename: /swapfile
+  size: 1G
+runcmd:
+  - systemctl enable --now docker
+  - mkdir -p /opt/citysettlers
+  - chown deploy:deploy /opt/citysettlers
