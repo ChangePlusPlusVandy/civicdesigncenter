@@ -1,0 +1,31 @@
+# Staging on the Azure VM: the game server behind Caddy.
+# Caddy terminates HTTPS on ports 80/443 with an automatic Let's Encrypt
+# certificate for SITE_ADDRESS, and proxies (including WebSockets) to server:3000.
+# Secrets come from /opt/citysettlers/.env on the VM (see README.md here).
+services:
+  server:
+    image: ghcr.io/changeplusplusvandy/civicdesigncenter:main
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - server
+
+volumes:
+  caddy-data:
+  caddy-config:
