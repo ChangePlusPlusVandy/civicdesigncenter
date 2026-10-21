@@ -1,4 +1,4 @@
-import { normalizeRoomCode } from "@/lib/room-code";
+import { normalizeRoomCode } from "@cs/shared";
 
 export interface JoinRequest {
   roomCode: string;
