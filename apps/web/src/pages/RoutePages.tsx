@@ -1,7 +1,7 @@
 import { ArrowLeft, MonitorUp, School, UsersRound } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { normalizeRoomCode } from "@cs/shared";
 import { Button } from "@/components/ui/button";
-import { normalizeRoomCode } from "@/lib/room-code";
 
 interface RoutePageProps {
   eyebrow: string;
