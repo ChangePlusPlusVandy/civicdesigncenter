@@ -18,10 +18,12 @@ export function JoinPage() {
     setIsJoining(true);
 
     try {
-      const player = await mockJoinGame({ roomCode, username });
-      navigate(`/play/${player.roomCode}`, {
-        state: { username: player.username },
+      const player = await mockJoinGame({
+        roomCode: roomCode.trim().toUpperCase(),
+        username,
       });
+      const playerParams = new URLSearchParams({ username: player.username });
+      navigate(`/play/${player.roomCode}?${playerParams.toString()}`);
     } catch (joinError) {
       setError(
         joinError instanceof Error
@@ -73,10 +75,9 @@ export function JoinPage() {
               autoCapitalize="characters"
               maxLength={8}
               placeholder="NASH24"
+              className="uppercase"
               value={roomCode}
-              onChange={(event) =>
-                setRoomCode(event.target.value.toUpperCase())
-              }
+              onChange={(event) => setRoomCode(event.target.value)}
               aria-describedby="room-code-help"
             />
             <p id="room-code-help" className="text-xs text-muted-foreground">

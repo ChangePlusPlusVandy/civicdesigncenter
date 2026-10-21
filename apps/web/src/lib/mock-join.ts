@@ -1,3 +1,5 @@
+import { normalizeRoomCode } from "@/lib/room-code";
+
 export interface JoinRequest {
   roomCode: string;
   username: string;
@@ -12,10 +14,10 @@ export async function mockJoinGame({
   roomCode,
   username,
 }: JoinRequest): Promise<JoinResult> {
-  const normalizedCode = roomCode.trim().toUpperCase();
+  const normalizedCode = normalizeRoomCode(roomCode);
   const normalizedUsername = username.trim();
 
-  if (!/^[A-Z0-9]{4,8}$/.test(normalizedCode)) {
+  if (!normalizedCode) {
     throw new Error("Room codes are 4–8 letters or numbers.");
   }
 

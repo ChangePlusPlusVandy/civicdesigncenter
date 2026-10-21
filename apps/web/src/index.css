@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @theme inline {
   --color-background: var(--background);
@@ -57,8 +56,16 @@
   --orange: #cc704a;
 }
 
-* {
-  border-color: var(--border);
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  button,
+  a,
+  input {
+    font: inherit;
+  }
 }
 
 html {
@@ -73,12 +80,6 @@ body {
     radial-gradient(circle at 86% 4%, rgb(204 112 74 / 9%), transparent 26rem),
     var(--background);
   color: var(--foreground);
-}
-
-button,
-a,
-input {
-  font: inherit;
 }
 
 ::selection {
