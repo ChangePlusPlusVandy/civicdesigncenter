@@ -1,6 +1,7 @@
 import { ArrowLeft, MonitorUp, School, UsersRound } from "lucide-react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { normalizeRoomCode } from "@/lib/room-code";
 
 interface RoutePageProps {
   eyebrow: string;
@@ -32,40 +33,68 @@ function RoutePage({ eyebrow, title, description, detail }: RoutePageProps) {
   );
 }
 
+function InvalidRoomCodePage() {
+  return (
+    <RoutePage
+      eyebrow="Invalid room code"
+      title="Check the room code and try again."
+      description="Room codes must be 4–8 letters or numbers. Return to the join page to enter a valid code."
+    />
+  );
+}
+
 export function PlayerPage() {
   const { code } = useParams();
-  const location = useLocation();
-  const username = (location.state as { username?: string } | null)?.username;
+  const roomCode = normalizeRoomCode(code);
+  const [searchParams] = useSearchParams();
+  const username = searchParams.get("username")?.trim();
+
+  if (!roomCode) {
+    return <InvalidRoomCodePage />;
+  }
+
   return (
     <RoutePage
       eyebrow="Player view"
       title={username ? `Welcome, ${username}.` : "Player view ready."}
       description="This route is ready for the player controls and state projection in the next gameplay work."
-      detail={`Room ${code ?? "—"}`}
+      detail={`Room ${roomCode}`}
     />
   );
 }
 
 export function CityPage() {
   const { code } = useParams();
+  const roomCode = normalizeRoomCode(code);
+
+  if (!roomCode) {
+    return <InvalidRoomCodePage />;
+  }
+
   return (
     <RoutePage
       eyebrow="Team city view"
       title="City view ready."
       description="Team-level map, resources, and city status will render here."
-      detail={`Room ${code ?? "—"}`}
+      detail={`Room ${roomCode}`}
     />
   );
 }
 
 export function ProjectorPage() {
   const { code } = useParams();
+  const roomCode = normalizeRoomCode(code);
+
+  if (!roomCode) {
+    return <InvalidRoomCodePage />;
+  }
+
   return (
     <RoutePage
       eyebrow="Projector view"
       title="Whole-room display ready."
       description="The shared classroom projection will use this route for public game state."
-      detail={`Room ${code ?? "—"}`}
+      detail={`Room ${roomCode}`}
     />
   );
 }
