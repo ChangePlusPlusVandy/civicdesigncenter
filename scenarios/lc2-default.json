@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "id": "lc2-default",
+  "name": "LC2 default",
+  "description": "The rules of the previous City Settlers (LC2) game, ported for engine work. See scenarios/README.md.",
+  "resources": [
+    { "id": "lumber", "name": "Lumber" },
+    { "id": "clay", "name": "Clay" },
+    { "id": "copper", "name": "Copper" },
+    { "id": "food", "name": "Food" }
+  ],
+  "natureResources": [
+    { "id": "fish", "name": "Fish" },
+    { "id": "animals", "name": "Animals" }
+  ],
+  "start": {
+    "year": 1,
+    "resources": { "lumber": 4, "clay": 4, "copper": 4, "food": 4 },
+    "stats": { "population": 3, "happiness": 5, "pollution": 0 }
+  },
+  "buildings": [
+    {
+      "id": "clay-mine",
+      "name": "Clay Mine",
+      "workers": 1,
+      "upkeep": { "lumber": 2, "food": 2 },
+      "output": { "clay": 5, "pollution": 2 },
+      "adjacency": {
+        "featureKind": "clay-deposit",
+        "required": false,
+        "draws": { "clay": 2 },
+        "affects": {},
+        "bonusOutput": { "clay": 2, "pollution": -1 }
+      }
+    },
+    {
+      "id": "copper-mine",
+      "name": "Copper Mine",
+      "workers": 1,
+      "upkeep": { "lumber": 2, "food": 2 },
+      "output": { "copper": 5, "pollution": 2 },
+      "adjacency": {
+        "featureKind": "copper-deposit",
+        "required": false,
+        "draws": { "copper": 2 },
+        "affects": {},
+        "bonusOutput": { "copper": 2, "pollution": -1 }
+      }
+    },
+    {
+      "id": "farm",
+      "name": "Farm",
+      "workers": 1,
+      "upkeep": { "lumber": 2, "clay": 1 },
+      "output": { "food": 4 },
+      "adjacency": {
+        "featureKind": "water",
+        "required": false,
+        "draws": {},
+        "affects": { "pollution": 2 },
+        "bonusOutput": { "food": 2 }
+      }
+    },
+    {
+      "id": "fishing-camp",
+      "name": "Fishing Camp",
+      "workers": 1,
+      "upkeep": { "copper": 1 },
+      "output": { "food": 5 },
+      "adjacency": {
+        "featureKind": "water",
+        "required": true,
+        "draws": { "fish": 2 },
+        "affects": {},
+        "bonusOutput": {}
+      }
+    },
+    {
+      "id": "hunting-camp",
+      "name": "Hunting Camp",
+      "workers": 1,
+      "upkeep": {},
+      "output": { "food": 3 },
+      "adjacency": {
+        "featureKind": "woods",
+        "required": true,
+        "draws": { "animals": 2 },
+        "affects": {},
+        "bonusOutput": {}
+      }
+    },
+    {
+      "id": "lumber-camp",
+      "name": "Lumber Camp",
+      "workers": 1,
+      "upkeep": { "clay": 1 },
+      "output": { "lumber": 5 },
+      "adjacency": {
+        "featureKind": "woods",
+        "required": true,
+        "draws": { "lumber": 3 },
+        "affects": {},
+        "bonusOutput": {}
+      }
+    }
+  ],
+  "map": {
+    "width": 16,
+    "height": 16,
+    "tiles": [
+      ".......~~....www",
+      ".......~~....www",
+      "W.....~~.....www",
+      "W.....~~.....www",
+      "W.....~~....wwww",
+      "WWWcc.~~....wwww",
+      "WWWcc~~.........",
+      "WWW..~~.........",
+      "WWW..~~.........",
+      "WWW..~~.........",
+      "WWW..~~.......uu",
+      "WWW..~~.......uu",
+      "WW....~~~~~~....",
+      "WW....~~~~~~....",
+      "WW........~~....",
+      "WW........~~...."
+    ],
+    "legend": {
+      "W": "west-woods",
+      "w": "east-woods",
+      "~": "lake",
+      "c": "clay-deposit",
+      "u": "copper-deposit"
+    }
+  },
+  "features": [
+    {
+      "id": "west-woods",
+      "name": "West Woods",
+      "kind": "woods",
+      "stocks": { "lumber": 100, "animals": 30 },
+      "regrowth": { "lumber": 1.1, "animals": 1.1 }
+    },
+    {
+      "id": "east-woods",
+      "name": "East Woods",
+      "kind": "woods",
+      "stocks": { "lumber": 100, "animals": 30 },
+      "regrowth": { "lumber": 1.1, "animals": 1.1 }
+    },
+    {
+      "id": "lake",
+      "name": "Lake",
+      "kind": "water",
+      "stocks": { "fish": 50, "pollution": 0 },
+      "regrowth": { "fish": 1.2, "pollution": 0.8 }
+    },
+    {
+      "id": "clay-deposit",
+      "name": "Clay Deposit",
+      "kind": "clay-deposit",
+      "stocks": { "clay": 30 },
+      "regrowth": {}
+    },
+    {
+      "id": "copper-deposit",
+      "name": "Copper Deposit",
+      "kind": "copper-deposit",
+      "stocks": { "copper": 30 },
+      "regrowth": {}
+    }
+  ],
+  "cities": [
+    {
+      "id": "red",
+      "name": "Red City",
+      "color": "#ff0000",
+      "plot": { "x": 1, "y": 1, "width": 4, "height": 4 },
+      "view": { "x": 0, "y": 0, "width": 6, "height": 6 }
+    },
+    {
+      "id": "green",
+      "name": "Green City",
+      "color": "#008000",
+      "plot": { "x": 9, "y": 0, "width": 4, "height": 4 },
+      "view": { "x": 8, "y": 0, "width": 6, "height": 5 }
+    },
+    {
+      "id": "pink",
+      "name": "Pink City",
+      "color": "#ff5cbe",
+      "plot": { "x": 12, "y": 6, "width": 4, "height": 4 },
+      "view": { "x": 11, "y": 5, "width": 5, "height": 6 }
+    },
+    {
+      "id": "blue",
+      "name": "Blue City",
+      "color": "#0000ff",
+      "plot": { "x": 12, "y": 12, "width": 4, "height": 4 },
+      "view": { "x": 11, "y": 11, "width": 5, "height": 5 }
+    },
+    {
+      "id": "yellow",
+      "name": "Yellow City",
+      "color": "#ffc107",
+      "plot": { "x": 2, "y": 12, "width": 4, "height": 4 },
+      "view": { "x": 1, "y": 11, "width": 6, "height": 5 }
+    }
+  ]
+}
