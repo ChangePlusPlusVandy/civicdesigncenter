@@ -1,34 +1,37 @@
 # Scenarios
 
-A scenario is the data a game is played with: resources, starting stock,
-buildings, the map, nature features and cities. It is validated by
-`ScenarioSchema` in `packages/shared/src/scenario.ts`. Rules live in
-`packages/engine`.
+A scenario holds the data a game is played with: resources, starting stock,
+buildings, the map, nature features and cities. `ScenarioSchema` in
+`packages/shared/src/scenario.ts` validates it, and the rules that act on it
+live in `packages/engine`.
 
-- `lc2-default.json`: the previous City Settlers game ([LC2](https://github.com/Visheshk/LC2)),
-  ported as the reference scenario for engine work.
-- `nashville-v1.json`: the MVP scenario (not written yet; see #38).
+- `lc2-default.json` is the previous City Settlers game ([LC2](https://github.com/Visheshk/LC2)),
+  ported so engine work has a real scenario to test against.
+- `nashville-v1.json` will be the MVP scenario. It isn't written yet (#38).
 
 ## Format notes
 
 - Ids are lowercase kebab-case.
-- `map.tiles` is one string per row, top to bottom, one character per tile.
-  `.` is empty; other characters map to a feature id through `map.legend`.
-  Tile `(x, y)` is `tiles[y][x]`.
-- City plots and views are rectangles. A plot may not overlap another plot or
-  a feature, and the view must contain the plot.
-- Building `upkeep` and `output` are per round the building runs. `output` may
-  include stats (`pollution: 2`). `adjacency` describes a nearby feature:
-  whether it is `required` to place the building, what the building `draws`
-  from it, what it `affects` on it, and the `bonusOutput` it gives.
-- Feature `regrowth` is the starting multiplier per stock between rounds.
+- `map.tiles` has one string per row, top to bottom, and one character per
+  tile. `.` is an empty tile; any other character maps to a feature id through
+  `map.legend`. Tile `(x, y)` is `tiles[y][x]`.
+- City plots and views are rectangles. A plot can't overlap another plot or a
+  feature, and the city's view has to contain its plot.
+- A building's `upkeep` and `output` apply each round it runs, and `output`
+  can include stats such as `pollution: 2`. `adjacency` covers a nearby
+  feature: whether the building needs one to be placed (`required`), what it
+  takes from the feature (`draws`), what it adds to it (`affects`), and the
+  extra output it gets (`bonusOutput`).
+- A feature's `regrowth` is the multiplier each stock starts with between
+  rounds.
 
 ## How lc2-default was ported
 
-LC2's sources disagree in places. The port uses the values in the code that
-ran (`imports/api/links/methods.js`), not its help text or its saved database
-dump. Rule behaviour (how bonuses, pollution and happiness are computed) is
-not ported here; it belongs to the engine tickets (#21, #22, #23).
+LC2's code, help text and saved database dump don't always agree. Where they
+differ, the port takes the value from the code that ran
+(`imports/api/links/methods.js`). Only data is ported. How bonuses, pollution
+and happiness are worked out each round is left to the engine tickets (#21,
+#22, #23).
 
 | Item                 | Ported value                                                                                                            | Where LC2 disagrees                                           |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -41,17 +44,16 @@ not ported here; it belongs to the engine tickets (#21, #22, #23).
 | Workers              | 1 per running building                                                                                                  | Implicit in LC2 (`roundEmployed`)                             |
 | Cities               | the five with map positions: red, green, pink, blue, yellow                                                             | LC2 lists eight accounts; more than five crashed map setup    |
 
-Renamed for clarity:
+A few names changed on the way over:
 
 - Building ids: `claymine` → `clay-mine`, `foodfarm` → `farm`, and so on.
 - City ids: `red-city` → `red`.
 - Features: `woods1`/`woods2` → `west-woods`/`east-woods`, `mine1`/`mine2` → `clay-deposit`/`copper-deposit`.
-- Feature kinds: LC2 used `lumber` for woods; here the kind is `woods`.
+- LC2 gave woods the feature kind `lumber`. Here it's `woods`.
 
-Not ported:
-
-- LC2's hard-coded feature-to-city neighbour lists. The map's 4-neighbour
-  adjacency gives the same pairs (#20).
-- LC2 had no purchase price. Buildings are paid for by winning an auction
-  bid in a randomly drawn resource (#22).
-- Bugs: tied lots recorded an undefined currency; happiness could divide by zero.
+Some things were left out on purpose. LC2 hard-coded which cities border each
+feature; the map's 4-neighbour adjacency gives the same pairs, so the list
+isn't needed (#20). Buildings have no purchase price because, as in LC2, a city
+pays for one by winning an auction bid in a randomly drawn resource (#22). Two
+LC2 bugs stayed behind: tied lots recorded an undefined currency, and the
+happiness formula could divide by zero.
