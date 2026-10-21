@@ -1,3 +1,29 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
 :root {
   font-family:
     Inter,
@@ -7,38 +33,55 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  color: #24352c;
-  background: #f6f5ee;
+  color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  --paper: #f6f5ee;
+  --radius: 0.75rem;
+  --background: #f6f5ee;
+  --foreground: #24352c;
   --card: #fbfaf5;
-  --ink: #24352c;
-  --muted: #6e796f;
-  --green: #315c45;
+  --card-foreground: #24352c;
+  --primary: #315c45;
+  --primary-foreground: #f8f7f1;
+  --secondary: #e8ece5;
+  --secondary-foreground: #24352c;
+  --muted: #ecece5;
+  --muted-foreground: #6e796f;
+  --accent: #f0e1d8;
+  --accent-foreground: #7f432b;
+  --destructive: #b63d32;
+  --border: #d9ddd3;
+  --input: #cfd5cb;
+  --ring: #315c45;
   --orange: #cc704a;
-  --line: #d9ddd3;
 }
 
 * {
-  box-sizing: border-box;
+  border-color: var(--border);
+}
+
+html {
+  background: var(--background);
 }
 
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background:
+    radial-gradient(circle at 86% 4%, rgb(204 112 74 / 9%), transparent 26rem),
+    var(--background);
+  color: var(--foreground);
 }
 
 button,
-a {
+a,
+input {
   font: inherit;
 }
 
 ::selection {
-  color: var(--paper);
-  background: var(--green);
+  color: var(--primary-foreground);
+  background: var(--primary);
 }
