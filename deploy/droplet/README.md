@@ -8,7 +8,7 @@ Azure App Service is the fallback ([`../azure-appservice`](../azure-appservice/R
 - **Shared host: add only.** Our files live in `/opt/citysettlers`; don't
   change other apps, users, sshd or the firewall.
 - **Docker:** Compose project `citysettlers` (`compose.tunnel.yml`), image
-  `ghcr.io/changeplusplusvandy/civicdesigncenter:main` (package must be public).
+  `ghcr.io/changeplusplusvandy/civicdesigncenter:main` (private: org rules forbid public packages).
 - **Ports:** 80/443 are already bound by another app, so traffic comes in
   through a Cloudflare named tunnel (no inbound ports). The server also binds
   `127.0.0.1:${HOST_PORT}` (default 3000) for debugging.
@@ -34,13 +34,15 @@ CORS_ORIGINS=<Vercel origins, comma-separated>
 ## Deploy
 
 `deploy-droplet.yml` runs after each `Server image` build on `main`. Its SSH
-key is restricted to `deploy.sh` (pull, `up -d`, wait for `/healthz`):
+key is restricted to `deploy.sh` (pull, `up -d`, wait for `/healthz`). The job
+sends its short-lived `GITHUB_TOKEN`, which `deploy.sh` uses for the pull and
+then logs out, so no registry credential is stored on the host:
 
 ```
 command="/opt/citysettlers/deploy.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA...
 ```
 
-Manual: `ssh root@<host> /opt/citysettlers/deploy.sh`. Logs:
+Manual: run the workflow (`gh workflow run deploy-droplet.yml`). Logs:
 `docker compose logs -f server` (or `tunnel`). Test: `ssh -L 3000:127.0.0.1:3000 root@<host>`,
 then http://localhost:3000/healthz.
 

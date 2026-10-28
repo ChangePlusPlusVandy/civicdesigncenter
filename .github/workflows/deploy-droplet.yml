@@ -1,8 +1,9 @@
 name: Deploy (droplet)
 
 # Redeploys the droplet after each successful Server image build on main.
-# The SSH key is forced to /opt/citysettlers/deploy.sh on the host, so the
-# command sent here is ignored. See deploy/droplet/README.md.
+# The SSH key is forced to /opt/citysettlers/deploy.sh on the host; the only
+# thing sent is this job's GITHUB_TOKEN, so the host can pull the private
+# image without a stored credential. See deploy/droplet/README.md.
 # Migrations stay with the Neon migrations job (#18).
 
 on:
@@ -14,7 +15,7 @@ on:
 
 concurrency: { group: deploy-droplet, cancel-in-progress: false }
 
-permissions: { contents: read }
+permissions: { contents: read, packages: read }
 
 jobs:
   deploy:
@@ -26,8 +27,9 @@ jobs:
           KEY: ${{ secrets.DROPLET_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DROPLET_KNOWN_HOSTS }}
           TARGET: ${{ vars.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          ssh -o StrictHostKeyChecking=yes -o BatchMode=yes "$TARGET" deploy
+          ssh -o StrictHostKeyChecking=yes -o BatchMode=yes "$TARGET" "deploy $GHCR_TOKEN"
