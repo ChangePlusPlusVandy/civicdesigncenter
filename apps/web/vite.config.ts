@@ -1,4 +1,6 @@
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 
 // One .env at the repo root is shared by the web client and the server.
@@ -10,7 +12,12 @@ export default defineConfig(({ mode }) => {
   const serverUrl = `http://localhost:${env.PORT || 3000}`;
 
   return {
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
+    resolve: {
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+      },
+    },
     envDir,
     server: {
       // In dev, the client calls its own origin and Vite forwards to the server.
