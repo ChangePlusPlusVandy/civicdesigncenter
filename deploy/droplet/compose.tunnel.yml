@@ -1,0 +1,25 @@
+# Server + Cloudflare named tunnel, for a host whose 80/443 are taken.
+# cloudflared connects out to Cloudflare and routes the tunnel
+# (--url) to http://server:3000. The server also listens on localhost for SSH-tunnel
+# debugging. Select it with COMPOSE_FILE=compose.tunnel.yml in .env.
+name: citysettlers
+
+services:
+  server:
+    image: ghcr.io/changeplusplusvandy/civicdesigncenter:main
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:${HOST_PORT:-3000}:3000"
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --url http://server:3000
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - server

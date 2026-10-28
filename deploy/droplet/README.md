@@ -1,62 +1,52 @@
-# Production on the DigitalOcean droplet (planned)
+# Droplet (staging + playtest production)
 
-Used once droplet access is granted. Until then, staging runs on Azure App
-Service; see [`../azure-appservice/README.md`](../azure-appservice/README.md).
+Server image from GHCR on the stakeholder's DigitalOcean droplet. DB on Neon.
+Azure App Service is the fallback ([`../azure-appservice`](../azure-appservice/README.md)).
 
-The droplet runs the server image behind Caddy. The database stays on Neon.
+## Setup
 
-```
-browser ──https──> Caddy :443 (droplet) ──> server:3000 ──> Neon
-```
+- **Shared host: add only.** Our files live in `/opt/citysettlers`; don't
+  change other apps, users, sshd or the firewall.
+- **Docker:** Compose project `citysettlers` (`compose.tunnel.yml`), image
+  `ghcr.io/changeplusplusvandy/civicdesigncenter:main` (private: org rules forbid public packages).
+- **Ports:** 80/443 are already bound by another app, so traffic comes in
+  through a Cloudflare named tunnel (no inbound ports). The server also binds
+  `127.0.0.1:${HOST_PORT}` (default 3000) for debugging.
+- **Tunnel:** `cloudflared tunnel login`, `tunnel create citysettlers`,
+  `tunnel route dns citysettlers <subdomain>`; `tunnel token citysettlers`
+  goes in `.env`. Compose routes it to `http://server:3000`.
+- **GitHub Environment `droplet`** (`main` only): secrets `DROPLET_SSH_KEY`,
+  `DROPLET_KNOWN_HOSTS`, `DROPLET_HOST`; variable `DROPLET_USER`.
 
-- **Image:** built and published by the `Server image` workflow on every
-  merge to `main` (`ghcr.io/changeplusplusvandy/civicdesigncenter:main`). The
-  droplet only pulls it. Make the GHCR package public (org **Packages →
-  civicdesigncenter → Package settings → Change visibility**) so it can pull
-  without credentials.
-- **HTTPS:** Caddy gets a Let's Encrypt certificate for `SITE_ADDRESS`
-  automatically and proxies HTTP and WebSockets to the server. It needs a DNS
-  name pointing at the droplet and ports 80 and 443 open.
-
-## Set up
-
-1. Create an Ubuntu 24.04 droplet (1 GB RAM is enough). Use `cloud-init.yaml`
-   as user data, with your SSH public key in it. Allow ports 22 (your IP only),
-   80 and 443 in the firewall.
-2. Point a DNS name at the droplet's IP.
-3. Configure and start:
-
-   ```sh
-   ssh deploy@<host>
-   cloud-init status --wait          # first boot installs Docker
-   cd /opt/citysettlers
-   base=https://raw.githubusercontent.com/ChangePlusPlusVandy/civicdesigncenter/main/deploy/droplet
-   curl -fsSLO "$base/compose.yml" && curl -fsSLO "$base/Caddyfile"
-   nano .env && chmod 600 .env       # see below
-   docker compose up -d
-   ```
-
-`/opt/citysettlers/.env` (never commit it):
+First time, as root: `bash bootstrap.sh --no-user` (installs Docker if
+missing, creates `/opt/citysettlers`, installs `deploy.sh`), then copy
+`compose.tunnel.yml` there and write `.env` (mode 600):
 
 ```sh
-SITE_ADDRESS=<DNS name, e.g. citysettlers.example.org>
-DATABASE_URL=<Neon pooled connection string>
-SESSION_SECRET=<long random string: openssl rand -hex 32>
-CORS_ORIGINS=<Vercel origin(s), comma-separated>
+COMPOSE_FILE=compose.tunnel.yml
+HOST_PORT=3000
+TUNNEL_TOKEN=<Cloudflare tunnel token>
+DATABASE_URL=<Neon pooled URL>
+SESSION_SECRET=<openssl rand -hex 32>
+CORS_ORIGINS=<Vercel origins, comma-separated>
 ```
 
-Check it: `curl https://<host>/healthz` returns `{"ok":true,...}`. Then
-point `VITE_API_URL` in Vercel at the new host.
+## Deploy
 
-## Update to the latest `main`
+`deploy-droplet.yml` runs after each `Server image` build on `main`. Its SSH
+key is restricted to `deploy.sh` (pull, `up -d`, wait for `/healthz`). The job
+sends its short-lived `GITHUB_TOKEN`, which `deploy.sh` uses for the pull and
+then logs out, so no registry credential is stored on the host:
 
-```sh
-ssh deploy@<host> 'cd /opt/citysettlers && docker compose pull && docker compose up -d'
+```
+command="/opt/citysettlers/deploy.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA...
 ```
 
-## Troubleshooting
+Manual: run the workflow (`gh workflow run deploy-droplet.yml`). Logs:
+`docker compose logs -f server` (or `tunnel`). Test: `ssh -L 3000:127.0.0.1:3000 root@<host>`,
+then http://localhost:3000/healthz.
 
-- Logs: `docker compose logs -f server` (or `caddy`).
-- No certificate: ports 80 and 443 must be open and the DNS name must resolve
-  to the droplet.
-- Out of memory: `free -h`. 1 GB RAM plus 1 GB swap is the minimum.
+## Own droplet
+
+`cloud-init.yaml` + `compose.yml` + `Caddyfile` (Caddy on 80/443 with
+automatic HTTPS for `SITE_ADDRESS`).
