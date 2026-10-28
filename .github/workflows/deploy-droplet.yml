@@ -1,0 +1,33 @@
+name: Deploy (droplet)
+
+# Redeploys the droplet after each successful Server image build on main.
+# The SSH key is forced to /opt/citysettlers/deploy.sh on the host, so the
+# command sent here is ignored. See deploy/droplet/README.md.
+# Migrations stay with the Neon migrations job (#18).
+
+on:
+  workflow_run:
+    workflows: ["Server image"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: { group: deploy-droplet, cancel-in-progress: false }
+
+permissions: { contents: read }
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    environment: droplet
+    steps:
+      - env:
+          KEY: ${{ secrets.DROPLET_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DROPLET_KNOWN_HOSTS }}
+          TARGET: ${{ vars.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -o StrictHostKeyChecking=yes -o BatchMode=yes "$TARGET" deploy

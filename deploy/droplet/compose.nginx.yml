@@ -1,0 +1,16 @@
+# Variant for a host where nginx already owns ports 80/443 (no Caddy).
+# The server listens on localhost only; nginx proxies a subdomain to it
+# (see nginx-site.conf.example). Select it with COMPOSE_FILE=compose.nginx.yml
+# in /opt/citysettlers/.env so deploy.sh picks it up.
+name: citysettlers
+
+services:
+  server:
+    image: ghcr.io/changeplusplusvandy/civicdesigncenter:main
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    ports:
+      - "127.0.0.1:${HOST_PORT:-3000}:3000"
