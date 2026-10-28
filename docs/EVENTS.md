@@ -63,11 +63,3 @@ the repo). Notes from that export:
   `before` / `after` and rely on per-round snapshots for full state.
 - LC2 logs typed names (`localName`, `playerName`). We log pseudonymous
   `participant_id`s only.
-
-## Open questions (pending with the stakeholder)
-
-- Identifiers: LC2 logs the student's typed `localName`; we plan
-  pseudonymous participant IDs. Is that enough for the research use?
-- IRB and consent for the event log.
-- Export format (CSV, JSON, both) and who receives exports.
-- Should notification reads (`readBy`) be logged?

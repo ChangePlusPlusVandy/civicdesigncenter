@@ -15,7 +15,7 @@ facilitator console.
 | DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in the cloud                                                                                         |
 | Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped per-player token carrying a role (`seat` default, `trader` later); no student accounts |
 | Tests   | Vitest (engine; server integration on in-memory PGlite), Playwright smoke test                                                                                |
-| Hosting | Server on the DigitalOcean droplet (Docker + Caddy/nginx), Azure App Service F1 as fallback, Neon Postgres, Vercel previews                                   |
+| Hosting | Server on the DigitalOcean droplet (Docker + Cloudflare Tunnel), Azure App Service F1 as fallback, Neon Postgres, Vercel previews                             |
 
 ## Repository layout
 
@@ -123,7 +123,7 @@ server  auth middleware          -> actor { player | teacher, gameId, participan
   migrations against Neon (`DATABASE_URL_DIRECT` secret).
 - **Server hosting:** staging, and production for playtests, run on the
   stakeholder's existing DigitalOcean droplet: the server image from GHCR
-  behind Caddy or nginx. GitHub Actions redeploys after every image build on
+  behind a Cloudflare Tunnel. GitHub Actions redeploys after every image build on
   `main` through the GitHub Environment `droplet` and a deploy key limited to
   `deploy.sh`. It is a shared machine, so changes there are additive only. See
   `deploy/droplet/README.md`.

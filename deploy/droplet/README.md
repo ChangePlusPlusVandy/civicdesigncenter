@@ -7,20 +7,24 @@ Azure App Service is the fallback ([`../azure-appservice`](../azure-appservice/R
 
 - **Shared host: add only.** Our files live in `/opt/citysettlers`; don't
   change other apps, users, sshd or the firewall.
-- **Docker:** Compose project `citysettlers` (`compose.nginx.yml`), image
+- **Docker:** Compose project `citysettlers` (`compose.tunnel.yml`), image
   `ghcr.io/changeplusplusvandy/civicdesigncenter:main` (package must be public).
-- **Ports:** 80/443 are already bound by another app, so the server binds
-  `127.0.0.1:${HOST_PORT}` (default 3000).
+- **Ports:** 80/443 are already bound by another app, so traffic comes in
+  through a Cloudflare named tunnel (no inbound ports). The server also binds
+  `127.0.0.1:${HOST_PORT}` (default 3000) for debugging.
+- **Tunnel:** Cloudflare Zero Trust → Networks → Tunnels → create one; public
+  hostname = our subdomain → `http://server:3000`; its token goes in `.env`.
 - **GitHub Environment `droplet`** (`main` only): secrets `DROPLET_SSH_KEY`,
   `DROPLET_KNOWN_HOSTS`, `DROPLET_HOST`; variable `DROPLET_USER`.
 
 First time, as root: `bash bootstrap.sh --no-user` (installs Docker if
 missing, creates `/opt/citysettlers`, installs `deploy.sh`), then copy
-`compose.nginx.yml` there and write `.env` (mode 600):
+`compose.tunnel.yml` there and write `.env` (mode 600):
 
 ```sh
-COMPOSE_FILE=compose.nginx.yml
+COMPOSE_FILE=compose.tunnel.yml
 HOST_PORT=3000
+TUNNEL_TOKEN=<Cloudflare tunnel token>
 DATABASE_URL=<Neon pooled URL>
 SESSION_SECRET=<openssl rand -hex 32>
 CORS_ORIGINS=<Vercel origins, comma-separated>
@@ -36,7 +40,7 @@ command="/opt/citysettlers/deploy.sh",no-port-forwarding,no-agent-forwarding,no-
 ```
 
 Manual: `ssh root@<host> /opt/citysettlers/deploy.sh`. Logs:
-`docker compose logs -f server`. Test: `ssh -L 3000:127.0.0.1:3000 root@<host>`,
+`docker compose logs -f server` (or `tunnel`). Test: `ssh -L 3000:127.0.0.1:3000 root@<host>`,
 then http://localhost:3000/healthz.
 
 ## Own droplet
