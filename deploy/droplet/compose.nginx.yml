@@ -1,7 +1,5 @@
-# Variant for a host where nginx already owns ports 80/443 (no Caddy).
-# The server listens on localhost only; nginx proxies a subdomain to it
-# (see nginx-site.conf.example). Select it with COMPOSE_FILE=compose.nginx.yml
-# in /opt/citysettlers/.env so deploy.sh picks it up.
+# Server only, on localhost (no proxy): for a host whose 80/443 are taken.
+# Select it with COMPOSE_FILE=compose.nginx.yml in /opt/citysettlers/.env.
 name: citysettlers
 
 services:
