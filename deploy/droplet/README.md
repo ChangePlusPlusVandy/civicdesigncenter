@@ -12,8 +12,9 @@ Azure App Service is the fallback ([`../azure-appservice`](../azure-appservice/R
 - **Ports:** 80/443 are already bound by another app, so traffic comes in
   through a Cloudflare named tunnel (no inbound ports). The server also binds
   `127.0.0.1:${HOST_PORT}` (default 3000) for debugging.
-- **Tunnel:** Cloudflare Zero Trust → Networks → Tunnels → create one; public
-  hostname = our subdomain → `http://server:3000`; its token goes in `.env`.
+- **Tunnel:** `cloudflared tunnel login`, `tunnel create citysettlers`,
+  `tunnel route dns citysettlers <subdomain>`; `tunnel token citysettlers`
+  goes in `.env`. Compose routes it to `http://server:3000`.
 - **GitHub Environment `droplet`** (`main` only): secrets `DROPLET_SSH_KEY`,
   `DROPLET_KNOWN_HOSTS`, `DROPLET_HOST`; variable `DROPLET_USER`.
 

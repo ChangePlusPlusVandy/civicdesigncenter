@@ -1,6 +1,6 @@
 # Server + Cloudflare named tunnel, for a host whose 80/443 are taken.
-# cloudflared connects out to Cloudflare; the tunnel's public hostname routes
-# to http://server:3000. The server also listens on localhost for SSH-tunnel
+# cloudflared connects out to Cloudflare and routes the tunnel
+# (--url) to http://server:3000. The server also listens on localhost for SSH-tunnel
 # debugging. Select it with COMPOSE_FILE=compose.tunnel.yml in .env.
 name: citysettlers
 
@@ -18,7 +18,7 @@ services:
   tunnel:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    command: tunnel --no-autoupdate run --url http://server:3000
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN}
     depends_on:
