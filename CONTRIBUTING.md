@@ -20,24 +20,6 @@
 - UI changes need screenshots at Chromebook size (1366×768) and tablet size.
 - Update `.env.example` and the docs when configuration changes.
 
-## Reviews
-
-- **Until 11/1:** request **@prisn9** on every PR. The EM reviews and approves everything.
-- **From 11/1:** CODEOWNERS will list owners for engine rules, auth, sockets
-  and migrations. Elsewhere, one approval from any teammate is enough.
-- Review within 48 hours. Check correctness, clarity, tests and maintainability.
-
-## Async check-ins
-
-Every **Tuesday and Thursday**, post in the team thread:
-
-- **Done:** what you finished
-- **Next:** what you're working on
-- **Blocked:** anything you need (tag who can help)
-
-Decisions and planning happen at the sync every other Sunday. Raise questions
-for the PM in the thread at least a week before the sync where you need the answer.
-
 ## Secrets and data
 
 - Never commit secrets or `.env`. Add new variables to `.env.example` with a comment.
