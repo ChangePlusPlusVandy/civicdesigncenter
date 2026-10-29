@@ -1,6 +1,6 @@
 # Contributing
 
-## Workflow (GitHub Flow)
+## Workflow 
 
 1. Every piece of work starts with an issue. Pick one assigned to you, or ask
    in the team thread before assigning yourself.
