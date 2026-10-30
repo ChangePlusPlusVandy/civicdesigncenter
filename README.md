@@ -68,6 +68,13 @@ Run from the repository root:
 
 To run a script in one workspace, use `-w`, for example `npm run dev -w apps/web`.
 
+Database scripts live in the server workspace:
+
+- `npm run db:generate -w apps/server` — generate a migration from `apps/server/src/db/drizzle-schema.ts`
+- `npm run db:migrate -w apps/server` — apply migrations (PGlite, or `DATABASE_URL_DIRECT` / `DATABASE_URL` if set)
+- `npm run db:seed -w apps/server` — wipe the local database and insert synthetic seed data
+- `npm run db:studio -w apps/server` — browse the database in Drizzle Studio
+
 ## Docs
 
 - [Architecture and tech stack](docs/ARCHITECTURE.md)
