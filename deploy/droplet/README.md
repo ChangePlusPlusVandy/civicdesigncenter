@@ -19,8 +19,7 @@ Azure App Service is the fallback ([`../azure-appservice`](../azure-appservice/R
   `DROPLET_KNOWN_HOSTS`, `DROPLET_HOST`; variable `DROPLET_USER`.
 
 First time, as root: `bash bootstrap.sh --no-user` (installs Docker if
-missing, creates `/opt/citysettlers`, installs `deploy.sh`), then copy
-`compose.tunnel.yml` there and write `.env` (mode 600):
+missing, creates `/opt/citysettlers`, installs `deploy.sh`), then write `.env` (mode 600):
 
 ```sh
 COMPOSE_FILE=compose.tunnel.yml
@@ -34,9 +33,10 @@ CORS_ORIGINS=<Vercel origins, comma-separated>
 ## Deploy
 
 `deploy-droplet.yml` runs after each `Server image` build on `main`. Its SSH
-key is restricted to `deploy.sh` (pull, `up -d`, wait for `/healthz`). The job
-sends its short-lived `GITHUB_TOKEN`, which `deploy.sh` uses for the pull and
-then logs out, so no registry credential is stored on the host:
+key is restricted to `deploy.sh`, which downloads the compose file from the
+commit being deployed, pulls with the job's short-lived `GITHUB_TOKEN` (then
+logs out; no registry credential is stored on the host), runs `up -d` and waits
+for `/healthz`:
 
 ```
 command="/opt/citysettlers/deploy.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA...
