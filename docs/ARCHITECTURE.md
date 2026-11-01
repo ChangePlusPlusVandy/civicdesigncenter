@@ -15,7 +15,7 @@ facilitator console.
 | DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in the cloud                                                                                         |
 | Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped per-player token carrying a role (`seat` default, `trader` later); no student accounts |
 | Tests   | Vitest (engine; server integration on in-memory PGlite), Playwright smoke test                                                                                |
-| Hosting | Server on the DigitalOcean droplet (Docker + Cloudflare Tunnel), Azure App Service F1 as fallback, Neon Postgres, Vercel previews                             |
+| Hosting | Server on the DigitalOcean droplet (Docker + Cloudflare Tunnel), Neon Postgres, Vercel previews                                                               |
 
 ## Repository layout
 
@@ -108,14 +108,13 @@ server  auth middleware          -> actor { player | teacher, gameId, participan
 
 ## Environments
 
-| Env        | Web                                         | API               | DB                                         |
-| ---------- | ------------------------------------------- | ----------------- | ------------------------------------------ |
-| Local      | Vite :5173, proxies `/api` and `/socket.io` | :3000             | PGlite in `./.pglite/`, or optional Docker |
-| CI         | —                                           | tests only        | in-memory PGlite                           |
-| PR preview | Vercel (`VITE_API_URL` = staging)           | Droplet           | Neon                                       |
-| Staging    | Served by the server (same origin)          | Droplet           | Neon                                       |
-| Production | Served by the server (same origin)          | Droplet           | Neon                                       |
-| Fallback   | Served by the server (same origin)          | Azure App Service | Neon                                       |
+| Env        | Web                                         | API        | DB                                         |
+| ---------- | ------------------------------------------- | ---------- | ------------------------------------------ |
+| Local      | Vite :5173, proxies `/api` and `/socket.io` | :3000      | PGlite in `./.pglite/`, or optional Docker |
+| CI         | —                                           | tests only | in-memory PGlite                           |
+| PR preview | Vercel (`VITE_API_URL` = staging)           | Droplet    | Neon                                       |
+| Staging    | Served by the server (same origin)          | Droplet    | Neon                                       |
+| Production | Served by the server (same origin)          | Droplet    | Neon                                       |
 
 - **Database:** Neon Postgres is the shared database for demos and staging.
   Local development and CI never touch it.
@@ -127,10 +126,9 @@ server  auth middleware          -> actor { player | teacher, gameId, participan
   `main` through the GitHub Environment `droplet` and a deploy key limited to
   `deploy.sh`. It is a shared machine, so changes there are additive only. See
   `deploy/droplet/README.md`.
-- **Fallback:** Azure App Service (Linux, free F1 plan) at
-  https://citysettlers-cdc.azurewebsites.net, deployed by hand, until the
-  droplet passes a smoke test; then it is retired. See
-  `deploy/azure-appservice/README.md`.
+- **Fallback:** none running. Azure App Service was the interim host and was
+  retired once the droplet was live; `deploy/azure-appservice/README.md`
+  recreates it if needed.
   For local demos: `npm run build && NODE_ENV=production npm start` with
   `DATABASE_URL` set to Neon.
 - CORS allows only the server's own origin and Vercel preview URLs.
