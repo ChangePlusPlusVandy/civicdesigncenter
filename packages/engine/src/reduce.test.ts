@@ -6,7 +6,7 @@ import { createInitialState } from "./state.ts";
 import type { Action, Actor, GameState } from "./types.ts";
 
 const scenario = ScenarioSchema.parse(lc2);
-const red: Actor = { kind: "player", playerId: "p1", cityId: "red" };
+const red: Actor = { kind: "player", participantId: "p1", cityId: "red" };
 const AT = 1_700_000_000_000;
 
 function gift(
@@ -51,7 +51,7 @@ describe("createInitialState", () => {
       stats: { population: 3, happiness: 5, pollution: 0 },
     });
     expect(state.features.lake).toEqual({ stocks: { fish: 50, pollution: 0 } });
-    expect(state.year).toBe(1);
+    expect(state.round).toBe(1);
     expect(state.seed).toBe(42);
     expect(state.rng).toBe(42);
   });
@@ -76,8 +76,15 @@ describe("reduce: giftResource", () => {
     expect(result.state.cities.green!.resources.lumber).toBe(7);
     expect(result.events).toEqual([
       {
-        type: "resourceGifted",
-        payload: { from: "red", to: "green", resource: "lumber", amount: 3 },
+        type: "trade.gift_sent",
+        payload: {
+          fromTeam: "red",
+          toTeam: "green",
+          resource: "lumber",
+          amount: 3,
+          fromBefore: 4,
+          toBefore: 4,
+        },
       },
     ]);
   });
@@ -120,7 +127,7 @@ describe("reduce: giftResource", () => {
         state,
         gift("green", "clay", 1, {
           kind: "player",
-          playerId: "p",
+          participantId: "p",
           cityId: "x",
         }),
       ),

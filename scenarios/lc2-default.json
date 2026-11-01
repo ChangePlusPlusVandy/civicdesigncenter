@@ -14,7 +14,7 @@
     { "id": "animals", "name": "Animals" }
   ],
   "start": {
-    "year": 1,
+    "round": 1,
     "resources": { "lumber": 4, "clay": 4, "copper": 4, "food": 4 },
     "stats": { "population": 3, "happiness": 5, "pollution": 0 }
   },

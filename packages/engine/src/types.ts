@@ -4,7 +4,7 @@ import type { RngState } from "./rng.ts";
 // Who sent an action. The server derives it from the auth token; clients never
 // send it. `cityId` is the scenario city the player's team plays.
 export type Actor =
-  | { kind: "player"; playerId: string; cityId: string }
+  | { kind: "player"; participantId: string; cityId: string }
   | { kind: "teacher"; teacherId: string };
 
 // An intent the server has validated, plus who sent it and when (ms since the
@@ -24,16 +24,27 @@ export type FeatureState = {
 // stays in the Scenario. Plain JSON only: it is stored as a snapshot.
 export type GameState = {
   scenarioId: string;
-  year: number;
+  round: number;
   seed: number;
   rng: RngState;
   cities: Record<string, CityState>;
   features: Record<string, FeatureState>;
 };
 
+// Event types and payload keys follow docs/EVENTS.md. Where the catalog says
+// "team", the value here is a scenario city id; the server maps it to a team
+// row through `teams.city_key`.
 export type GameEvent = {
-  type: "resourceGifted";
-  payload: { from: string; to: string; resource: string; amount: number };
+  type: "trade.gift_sent";
+  payload: {
+    fromTeam: string;
+    toTeam: string;
+    resource: string;
+    amount: number;
+    // What each side held of `resource` before the gift.
+    fromBefore: number;
+    toBefore: number;
+  };
 };
 
 export type RuleErrorCode =

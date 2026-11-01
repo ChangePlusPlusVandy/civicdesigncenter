@@ -28,7 +28,7 @@ export function createInitialState(
   const rng = seedRng(seed);
   return {
     scenarioId: scenario.id,
-    year: scenario.start.year,
+    round: scenario.start.round,
     seed: rng,
     rng,
     cities,

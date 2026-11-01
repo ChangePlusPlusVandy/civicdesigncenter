@@ -98,7 +98,7 @@ const ScenarioObject = z.strictObject({
   // Resources only nature features hold (fish, animals).
   natureResources: z.array(Resource),
   start: z.strictObject({
-    year: z.int().min(1),
+    round: z.int().min(1),
     // Missing resources start at 0.
     resources: z.record(Id, z.int().min(0)),
     stats: z.strictObject({

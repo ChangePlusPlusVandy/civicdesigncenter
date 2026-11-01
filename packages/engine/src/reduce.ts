@@ -70,6 +70,7 @@ function giftResource(
     );
   }
 
+  const receiverHeld = receiver.resources[resource] ?? 0;
   return {
     ok: true,
     state: {
@@ -84,13 +85,23 @@ function giftResource(
           ...receiver,
           resources: {
             ...receiver.resources,
-            [resource]: (receiver.resources[resource] ?? 0) + amount,
+            [resource]: receiverHeld + amount,
           },
         },
       },
     },
     events: [
-      { type: "resourceGifted", payload: { from, to, resource, amount } },
+      {
+        type: "trade.gift_sent",
+        payload: {
+          fromTeam: from,
+          toTeam: to,
+          resource,
+          amount,
+          fromBefore: held,
+          toBefore: receiverHeld,
+        },
+      },
     ],
   };
 }
