@@ -1,13 +1,22 @@
 import type { CityState, GameEvent, GameState } from "./types.ts";
 
 // The only code that changes a GameState. Events are facts the engine already
-// decided, so this never validates a rule; it only fails on a log that names a
-// city that does not exist (a corrupt log).
+// decided, so this never validates a rule; it only fails on a log that does not
+// belong to this game or names a city that does not exist (a corrupt log).
 export function applyEvent(state: GameState, event: GameEvent): GameState {
   switch (event.type) {
-    case "game.started":
+    case "game.started": {
+      // The log must belong to this game: same scenario, same seed.
+      const { scenario, seed } = event.payload;
+      if (scenario !== state.scenarioId || seed !== state.seed) {
+        throw new Error(
+          `game.started is for scenario "${scenario}" seed ${seed}, state is "${state.scenarioId}" seed ${state.seed}`,
+        );
+      }
+      return state;
+    }
     case "round.ended":
-      // Markers in the log: the phase change that follows carries the state.
+      // A marker in the log: the phase change that follows carries the state.
       return state;
     case "phase.advanced":
       return {

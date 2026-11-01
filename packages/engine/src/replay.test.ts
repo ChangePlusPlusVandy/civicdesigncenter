@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { applyEvent } from "./apply.ts";
 import { reduce } from "./reduce.ts";
 import { replay } from "./replay.ts";
 import {
@@ -111,10 +112,11 @@ describe("replay", () => {
     expect(again.state).toEqual(state);
   });
 
-  it("starts a different game from a different seed", () => {
-    const other = replay(scenario, SEED + 1, log);
-    expect(other.seed).toBe(SEED + 1);
-    expect(other).not.toEqual(state);
+  it("refuses a log from another seed or scenario", () => {
+    expect(() => replay(scenario, SEED + 1, log)).toThrow(/seed 42/);
+    const elsewhere = replay(scenario, SEED, []);
+    const foreign = { ...elsewhere, scenarioId: "nashville-v1" };
+    expect(() => log.reduce(applyEvent, foreign)).toThrow(/nashville-v1/);
   });
 
   it("records what each side held before every gift", () => {
