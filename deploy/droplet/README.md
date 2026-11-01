@@ -1,7 +1,7 @@
 # Droplet (staging + playtest production)
 
 Server image from GHCR on the stakeholder's DigitalOcean droplet. DB on Neon.
-Azure App Service is the fallback ([`../azure-appservice`](../azure-appservice/README.md)).
+To stand up Azure App Service as a fallback, see [`../azure-appservice`](../azure-appservice/README.md).
 
 ## Setup
 

@@ -1,51 +1,52 @@
-# Staging on Azure App Service
+# Azure App Service (retired fallback)
 
-Interim staging host until the DigitalOcean droplet
-([`../droplet`](../droplet/README.md)). The database is on Neon.
+Azure was the interim staging host before the droplet
+([`../droplet`](../droplet/README.md)). It was deleted on 2026-11-01. Follow
+this guide to set it up again, for example if the droplet becomes unavailable.
 
 ```
-browser ──https──> citysettlers-cdc.azurewebsites.net (App Service, Node 24) ──> Neon
+browser ──https──> <app>.azurewebsites.net (App Service, Node 24) ──> Neon
 ```
 
-| Resource         | Name                                                           |
-| ---------------- | -------------------------------------------------------------- |
-| Subscription     | Azure for Students                                             |
-| Resource group   | `rg-citysettlers` (westus)                                     |
-| App Service plan | `asp-citysettlers`, Linux **F1 (free)**                        |
-| Web app          | `citysettlers-cdc`: https://citysettlers-cdc.azurewebsites.net |
-| Deploy identity  | `id-citysettlers-deploy` (user-assigned managed identity)      |
+The server serves `apps/web/dist` itself (same origin). There is no Docker
+here: App Service runs the built output on its Node runtime.
 
-The subscription only allows these regions: `westus`, `canadacentral`,
-`francecentral`, `norwayeast`, `belgiumcentral`. We use `westus` to keep
-data in the US.
+## 1. Create the resources
 
-## How it's configured
-
-- Runtime `NODE|24-lts`, startup command `node apps/server/dist/index.js`.
-  The server also serves `apps/web/dist` (same origin).
-- WebSockets on, HTTPS only, health check `/healthz`.
-- App settings: `NODE_ENV`, `DATABASE_URL` (Neon pooled), `SESSION_SECRET`,
-  `SCM_DO_BUILD_DURING_DEPLOYMENT=true`. App Service sets `PORT`.
-  Real values live only in Azure; list names with
-  `az webapp config appsettings list -n citysettlers-cdc -g rg-citysettlers --query "[].name"`.
-
-## Free tier limits (F1)
-
-- Sleeps after about 20 idle minutes; the first request then takes a few seconds.
-- 60 CPU-minutes per day and 1 GB RAM, one instance, no "Always On".
-
-**On playtest days**, scale up to B1 (always on, no CPU quota, billed by the
-hour from the student credit), then back down afterwards:
+Use the Azure for Students subscription. It allows only `westus`,
+`canadacentral`, `francecentral`, `norwayeast` and `belgiumcentral`; use
+`westus` to keep data in the US. Web app names are global, so pick a free one.
 
 ```sh
-az appservice plan update -n asp-citysettlers -g rg-citysettlers --sku B1
-az appservice plan update -n asp-citysettlers -g rg-citysettlers --sku F1
+RG=rg-citysettlers APP=citysettlers-cdc PLAN=asp-citysettlers
+az group create -n $RG -l westus
+az appservice plan create -n $PLAN -g $RG --is-linux --sku F1
+az webapp create -n $APP -g $RG -p $PLAN --runtime "NODE:24-lts" \
+  --startup-file "node apps/server/dist/index.js"
+az webapp config set -n $APP -g $RG --web-sockets-enabled true \
+  --min-tls-version 1.2 --ftps-state FtpsOnly
+az webapp update -n $APP -g $RG --https-only true
+az webapp config set -n $APP -g $RG --generic-configurations '{"healthCheckPath": "/healthz"}'
 ```
 
-## Deploying
+## 2. App settings
 
-The deploy package is the built output plus a minimal `package.json`.
-App Service runs `npm install` for the runtime dependencies (Oryx):
+App Service sets `PORT` itself. Type the secrets in your own shell, never in
+the repo:
+
+```sh
+az webapp config appsettings set -n $APP -g $RG --settings \
+  NODE_ENV=production SCM_DO_BUILD_DURING_DEPLOYMENT=true \
+  DATABASE_URL="<Neon pooled URL>" SESSION_SECRET="$(openssl rand -hex 32)"
+```
+
+Add the new origin to `CORS_ORIGINS` wherever the Vercel previews point, and
+set `VITE_API_URL` in Vercel to `https://$APP.azurewebsites.net`.
+
+## 3. Deploy
+
+The package is the built output plus a minimal `package.json`; App Service
+runs `npm install` for the runtime dependencies (Oryx):
 
 ```
 package.json           { "type": "module", "dependencies": <apps/server runtime deps, without @cs/*> }
@@ -53,9 +54,34 @@ apps/server/dist/      tsup bundle (workspace packages inlined)
 apps/web/dist/         Vite build
 ```
 
-**From GitHub Actions** (deploy pipeline issue): log in with OIDC, no secrets
-needed. The managed identity trusts `repo:ChangePlusPlusVandy/civicdesigncenter:ref:refs/heads/main`
-and has **Website Contributor** on the web app. The IDs are repo variables.
+```sh
+npm ci && npm run build
+# stage package.json + apps/server/dist + apps/web/dist as above, then zip it.
+# On Windows use C:\Windows\System32\tar.exe -a -c -f app.zip package.json apps
+# (Git Bash's tar writes a tar archive, not a zip).
+az webapp deploy -n $APP -g $RG --src-path app.zip --type zip
+curl https://$APP.azurewebsites.net/healthz
+```
+
+## 4. Optional: deploy from GitHub Actions
+
+Log in with OIDC, so no secret is stored. Create a managed identity that trusts
+`main`, and give it Website Contributor on the app:
+
+```sh
+az identity create -n id-citysettlers-deploy -g $RG
+az identity federated-credential create -n github-main -g $RG \
+  --identity-name id-citysettlers-deploy \
+  --issuer https://token.actions.githubusercontent.com \
+  --subject repo:ChangePlusPlusVandy/civicdesigncenter:ref:refs/heads/main \
+  --audiences api://AzureADTokenExchange
+az role assignment create --role "Website Contributor" \
+  --assignee "$(az identity show -n id-citysettlers-deploy -g $RG --query principalId -o tsv)" \
+  --scope "$(az webapp show -n $APP -g $RG --query id -o tsv)"
+```
+
+Set repo variables `AZURE_CLIENT_ID` (the identity's `clientId`),
+`AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` and `AZURE_WEBAPP_NAME`, then:
 
 ```yaml
 permissions:
@@ -73,21 +99,22 @@ steps:
       package: app.zip
 ```
 
-Only workflows running on `main` can log in. To allow other branches or
-environments, add another federated credential to the identity.
+## Free tier (F1) limits
 
-**By hand** (anyone with access to the subscription):
-
-```sh
-npm ci && npm run build
-# stage package.json + apps/server/dist + apps/web/dist as above, then zip it.
-# On Windows use C:\Windows\System32\tar.exe -a -c -f app.zip package.json apps
-# (Git Bash's tar writes a tar archive, not a zip).
-az webapp deploy -n citysettlers-cdc -g rg-citysettlers --src-path app.zip --type zip
-```
+- Sleeps after about 20 idle minutes; the first request then takes a few seconds.
+- 60 CPU-minutes per day, 1 GB RAM, one instance, no "Always On".
+- For playtests, scale up to B1 (billed hourly from the student credit) and
+  back down afterwards: `az appservice plan update -n $PLAN -g $RG --sku B1`
+  (then `--sku F1`).
 
 ## Troubleshooting
 
-- Live logs: `az webapp log tail -n citysettlers-cdc -g rg-citysettlers`
-- Status and recent startup errors: `az webapp troubleshoot status -n citysettlers-cdc -g rg-citysettlers`
-- Failed deploy details: `https://citysettlers-cdc.scm.azurewebsites.net/api/deployments/latest`
+- Live logs: `az webapp log tail -n $APP -g $RG`
+- Failed deploy details: `https://$APP.scm.azurewebsites.net/api/deployments/latest`
+
+## Removing it again
+
+```sh
+az group delete -n $RG --yes
+gh variable delete AZURE_CLIENT_ID   # and the other AZURE_* variables
+```
