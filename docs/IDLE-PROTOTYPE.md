@@ -32,8 +32,31 @@ This prototype keeps the commons lesson and changes the rest:
 - **Several ways to win.** Biggest, Happiest, Greenest and Best Trader, plus a
   shared Region Health bar.
 
+## Maps
+
+Every map is a 16×16 grid with five city slots, one river and two woods, so
+the rules and balance carry over. Teachers pick one when creating a game.
+
+- **Nashville** (the default; a draft for the #27 workshop and #38): the
+  Cumberland River winds past Germantown, East Nashville and The Gulch; Percy
+  Warner Woods line the west for Sylvan Park and 12 South; Shelby Bottoms sits
+  by East Nashville; The Gulch has rail-yard copper and 12 South has clay.
+  Germantown and The Gulch have no woods, so they must trade for wood.
+  Downtown is a skyline nobody builds on, joined to East Nashville by a
+  pedestrian bridge.
+- **The Valley:** LC2's original map.
+
+`map.test.ts` checks every map's design rules (land plots that don't overlap,
+a river shared by 3+ cities, someone without woods, reachable deposits), and
+the balance simulation runs on each map. Adding a city means adding a map
+spec in `packages/idle/src/map.ts`.
+
 ## Each student's experience
 
+- **A first-day tutorial**: six hands-on steps (their land, supplies, build a
+  farm, build houses, the City tab, sharing the river). Action steps finish
+  when the city really does them, the control to use pulses, and it can be
+  skipped.
 - **An advisor** suggests the single most useful next step ("Start with food:
   a Farm feeds your people"), with a button that does it. Problems come first
   (hunger, full homes, no workers, pollution, a used-up river); ideas can be
@@ -48,6 +71,17 @@ This prototype keeps the commons lesson and changes the rest:
 - **Reflection.** Each season report asks one question (for example "Did your
   city's choices help or hurt the other cities?"). Answers go to the teacher
   console, which also shows each student's activity, and to teammates.
+- **Sound and celebration.** Small synthesized sounds (no files) for builds,
+  coins, trades, goals and meetings, quiet by default with a mute button;
+  confetti for goals and accepted trades.
+
+## For the teacher
+
+- **A "How to run a game" checklist** that ticks itself off as the class plays.
+- **Class data downloads** (#48): student activity and reflections (with
+  names, for the teacher's own records), city trends, the event log
+  (pseudonymous, for research), or everything as JSON. CSVs defuse text a
+  spreadsheet would run as a formula.
 
 ## The commons, and proof the lesson works
 
@@ -73,8 +107,8 @@ All numbers live in `packages/idle/src/content.ts`.
 ```
 packages/idle/            Rules: content, economy, reduce(), tick, projections,
                           wire protocol. Pure and deterministic, no I/O.
-apps/server/src/sandbox/  In-memory games: REST create/join, Socket.IO play,
-                          tick timer, research log.
+apps/server/src/sandbox/  Games: REST create/join/export, Socket.IO play,
+                          tick timer, research log, saving (store.ts).
 apps/server/scripts/      bots.ts: a simulated classroom.
 apps/web/src/game/        useGame (#26), session, API, game UI.
 apps/web/src/pages/       Play, teacher console, projector, debug, lab.
@@ -99,8 +133,8 @@ The server is authoritative, as in `ARCHITECTURE.md`:
 | ------------------ | ----------------------- | ---------------------------------------------------------------------------------------- |
 | `/join`            | Students                | Code + name; `/join?code=ABCDE` pre-fills the code                                       |
 | `/play/:code`      | Students (also `/city`) | 3D city, resource HUD, Build / Market / Trade / City tabs, spot picker, meeting, reports |
-| `/teach`           | Teacher                 | Create a game (2–5 cities)                                                               |
-| `/teach/:code`     | Teacher                 | Join code, start/pause/speed, roster (move/remove), meeting, events, all cities' data    |
+| `/teach`           | Teacher                 | Create a game: pick the map and 2–5 cities                                               |
+| `/teach/:code`     | Teacher                 | Join code, guide, start/pause/speed, roster, meeting, events, reflections, downloads     |
 | `/projector/:code` | Classroom screen        | Whole world, leaderboards, region health, meeting status and results                     |
 | `/debug/:code`     | Anyone                  | Raw projection and live event log for this device                                        |
 | `/dev/lab`         | Developers (dev only)   | One click: teacher, projector and 4 students side by side                                |
@@ -109,6 +143,20 @@ The server is authoritative, as in `ARCHITECTURE.md`:
 under 600 CSS px gets a friendly message. iPads, Chromebooks and computers
 pass. The check uses screen size, not the user agent, because iPad Safari
 reports itself as a Mac.
+
+## Saving games
+
+Games are saved to `sandbox_games` (one snapshot per game) and
+`sandbox_events` (the append-only research log): Postgres (Neon) when
+`DATABASE_URL` is set, otherwise PGlite in `SANDBOX_PGLITE_DIR`
+(`./.pglite-sandbox`). Saves happen at most once a second per changed game
+and on shutdown. On startup, every game touched in the last 12 hours comes
+back; a game that was running comes back paused for the teacher to resume.
+Tokens are stored only as SHA-256 hashes.
+
+The drivers match the main schema PR (#70); the tables are prefixed
+`sandbox_` and created idempotently, so they don't touch that schema or its
+migrations. Folding them into Drizzle later is a table move.
 
 ## Running and testing
 
@@ -119,11 +167,11 @@ npm run dev                  # web on :5173, server on :3000
 Then open `/dev/lab` and click **Create test class**, or go to `/teach` and
 create a game for real.
 
-| Check                                               | What it proves                                                                                                                                                                     |
-| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm test`                                          | Rules, balance simulation, and **14 socket tests** with a teacher and 5 students on a real server (sync, privacy, trades, market, meeting, retries, reconnects, roster, tick loop) |
-| `npm run test:e2e`                                  | Real browsers against the production build: teacher creates, 2 students join, build, sync, Town Meeting, season report, projector; phones blocked, iPads allowed                   |
-| `npm run bots -- --create --players 30 --minutes 2` | A full class against a running server (`--url` defaults to `http://localhost:3000`): action latency and tick timing                                                                |
+| Check                                               | What it proves                                                                                                                                                                                                                                                        |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm test`                                          | Rules and map checks, balance simulations on every map, socket tests with a teacher and 5 students on a real server (sync, privacy, trades, market, meeting, retries, reconnects, roster, tick loop, team attribution), saving and a full server restart, and exports |
+| `npm run test:e2e`                                  | Real browsers against the production build: teacher creates, 2 students join, tutorial, build, sync, Town Meeting, season report, reflection, projector; phones blocked, iPads allowed                                                                                |
+| `npm run bots -- --create --players 30 --minutes 2` | A full class against a running server (`--url` defaults to `http://localhost:3000`, `--map nashville`): action latency and tick timing                                                                                                                                |
 
 One measured run on a laptop: 30 bots at ×2 speed had acks at p50 1 ms and
 p95 13 ms, and ticks arrived every 1001 ms (2 s ÷ 2).
@@ -138,15 +186,17 @@ are mounting `/api/sandbox` in `app.ts` and attaching Socket.IO in `index.ts`.
 | `@cs/idle` rules                      | #21 / #22 / #23 engine work: same `reduce()` shape (state + actor + intent → state + events or error) |
 | `sandbox/room.ts`, `sandbox/index.ts` | #17 rooms and projections, #25 action pipeline (dedupe, rejected-action logging)                      |
 | Player join and tokens                | #24 identity (teacher accounts are a placeholder token here)                                          |
-| In-memory state and log               | #70 / #16 database: snapshots and the events table                                                    |
-| Economy and policies                  | #27 Nashville mechanics spec                                                                          |
+| `sandbox/store.ts` (saving)           | #70 / #16 database: snapshots and the events table, same drivers                                      |
+| Economy, policies, Nashville map      | #27 Nashville mechanics spec, #38 nashville-v1                                                        |
+| Exports                               | #48 gameplay data export                                                                              |
 | `useGame`, debug page                 | #26                                                                                                   |
 | Bots script                           | #30 load test                                                                                         |
 | Playwright tests                      | #39 smoke test                                                                                        |
 
 ## Not done yet
 
-- **No persistence.** A server restart ends every game.
+- **Nashville is a draft.** Neighborhoods, resources and tensions should
+  come from the stakeholder workshop (#27).
 - **Teacher identity is a token** saved in the browser that created the game.
   No accounts yet (#24).
 - **Vercel previews** would need CORS for `/api/sandbox` and the socket. Today
