@@ -63,7 +63,20 @@ server  auth middleware          -> actor { player | teacher, gameId, participan
 
 - Deterministic: the RNG seed and RNG state live in game state, and time is
   passed in with the action. The engine never calls `Math.random()` or `Date.now()`.
+- Events are the source of truth. `reduce` checks who may do the action in the
+  current phase, turns it into events, and folds them in with `applyEvent`,
+  the only code that changes state. `replay(scenario, seed, events)` rebuilds
+  a game from its log, which is how the server rehydrates. An event that uses
+  the RNG must carry the RNG state after it, so replays stay in step.
 - Replay test: the event log plus the initial seed must reproduce the final snapshot.
+- Lifecycle: a game starts in the lobby. The teacher starts it, then steps each
+  round through auction, build and resolve; leaving resolve ends the round and
+  opens the next auction. The teacher can pause (the phase is kept) and end it.
+  It also ends when a round finishes with no harvestable stock left in nature
+  (a working definition until the Nashville rules are frozen).
+- The engine checks the actor kind (player or teacher), the phase and the
+  paused flag. A player's seat or trader role is checked before the engine
+  (`can(role, actionType)`, see Identity).
 - Scenarios are data (JSON validated by a zod schema): resources, buildings,
   map, cities, starting stats. Rules are written concretely for the current
   scenario.
