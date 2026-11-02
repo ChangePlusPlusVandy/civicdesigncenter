@@ -23,7 +23,11 @@ export interface ActionMessage {
 
 export type Ack =
   | { ok: true; version: number; duplicate?: boolean }
-  | { ok: false; code: ErrorCode | "FORBIDDEN" | "NO_GAME"; message: string };
+  | {
+      ok: false;
+      code: ErrorCode | "FORBIDDEN" | "NO_GAME" | "OFFLINE";
+      message: string;
+    };
 
 // Server -> client events.
 export const SERVER_EVENTS = {
