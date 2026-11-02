@@ -1,28 +1,10 @@
-import { Component, useState, type ReactNode } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { createDemoBuildings } from "./map";
+import { buildDemoWorld } from "./demoWorld";
+import { WebGLBoundary } from "./WebGLBoundary";
 import { WorldCanvas } from "./WorldCanvas";
 
-const BACKDROP_BUILDINGS = createDemoBuildings();
-const BACKDROP_POLLUTION = { red: 5, green: 3, pink: 8, blue: 4, yellow: 2 };
-
-// No WebGL (old device, blocked GPU): render nothing and keep the page usable.
-export class WebGLBoundary extends Component<
-  { children: ReactNode; fallback?: ReactNode },
-  { failed: boolean }
-> {
-  state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  render() {
-    return this.state.failed
-      ? (this.props.fallback ?? null)
-      : this.props.children;
-  }
-}
+const DEMO = buildDemoWorld();
 
 export function WorldBackdrop({ className }: { className?: string }) {
   const [ready, setReady] = useState(false);
@@ -39,8 +21,9 @@ export function WorldBackdrop({ className }: { className?: string }) {
       >
         <WorldCanvas
           mode="backdrop"
-          buildings={BACKDROP_BUILDINGS}
-          pollution={BACKDROP_POLLUTION}
+          cities={DEMO.cities}
+          commons={DEMO.commons}
+          tick={DEMO.tick}
           onReady={() => setReady(true)}
         />
       </div>

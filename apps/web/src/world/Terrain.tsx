@@ -1,4 +1,4 @@
-import { useContext, useLayoutEffect, useRef } from "react";
+import { useContext, useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import {
   Color,
@@ -7,8 +7,18 @@ import {
   type InstancedMesh,
   type MeshStandardMaterial,
 } from "three";
-import { MAP_HEIGHT, MAP_WIDTH, TILES, cityAt, hash, type Tile } from "./map";
-import { MotionContext, toWorld } from "./scene";
+import {
+  COMMONS,
+  MAP_HEIGHT,
+  MAP_WIDTH,
+  TILES,
+  cityAt,
+  neighborOfKind,
+  type CommonsView,
+  type Tile,
+} from "@cs/idle";
+import { Ball } from "./parts";
+import { MotionContext, hash, toWorld } from "./scene";
 
 export interface TileHandlers {
   onTileHover?: (tile: Tile | null) => void;
@@ -21,16 +31,16 @@ const DEPOSITS = TILES.filter(
   (tile) => tile.kind === "clay" || tile.kind === "copper",
 );
 
-const GROUND_COLORS = {
+const GROUND = {
   grass: "#8dbb5a",
   woods: "#5e8c3c",
   clay: "#c48a5c",
   copper: "#9b9479",
   water: "#4aa6cc",
 };
-const PAVING = "#ddd2b4";
+const SAND = "#d8c693";
 const CLEAN_WATER = new Color("#4aa6cc");
-const DIRTY_WATER = new Color("#80794a");
+const DIRTY_WATER = new Color("#7d7448");
 const TREE_COLORS = ["#3f7a3a", "#4c8a3f", "#356b35", "#5d9746"];
 const ROCK_COLORS = {
   clay: ["#b8693f", "#a65a35", "#cf8250"],
@@ -42,10 +52,13 @@ interface TreeSpot {
   z: number;
   scale: number;
   color: string;
+  commons: "westWoods" | "eastWoods";
+  // Trees disappear in this order as the woods are cut down.
+  rank: number;
 }
 
 const TREES: TreeSpot[] = TILES.filter((tile) => tile.kind === "woods").flatMap(
-  ({ x, y }) => {
+  ({ x, y, commons }) => {
     const [cx, cz] = toWorld(x, y);
     const count = 2 + Math.round(hash(x, y, 1));
     return Array.from({ length: count }, (_, i) => ({
@@ -53,6 +66,8 @@ const TREES: TreeSpot[] = TILES.filter((tile) => tile.kind === "woods").flatMap(
       z: cz + (hash(x, y, 6 + i) - 0.5) * 0.6,
       scale: 0.75 + hash(x, y, 10 + i) * 0.55,
       color: TREE_COLORS[Math.floor(hash(x, y, 14 + i) * 4)] ?? "#4c8a3f",
+      commons: commons === "eastWoods" ? "eastWoods" : "westWoods",
+      rank: hash(x, y, 18 + i),
     }));
   },
 );
@@ -63,15 +78,16 @@ const tint = new Color();
 
 function landColor(tile: Tile): Color {
   const city = cityAt(tile.x, tile.y);
-  if (city) {
-    return scratch.set(PAVING).lerp(tint.set(city.color), 0.16);
+  const base = scratch.set(GROUND[tile.kind]);
+  // Grass along the river fades toward a sandy bank.
+  if (tile.kind === "grass" && neighborOfKind(tile.x, tile.y, "water")) {
+    base.lerp(tint.set(SAND), 0.4);
   }
-  return scratch
-    .set(GROUND_COLORS[tile.kind])
-    .offsetHSL(0, 0, (hash(tile.x, tile.y) - 0.5) * 0.07);
+  if (city) base.lerp(tint.set(city.color), 0.12).offsetHSL(0, -0.05, 0.05);
+  return base.offsetHSL(0, 0, (hash(tile.x, tile.y) - 0.5) * 0.05);
 }
 
-function placeInstance(
+function place(
   mesh: InstancedMesh,
   index: number,
   position: [number, number, number],
@@ -85,22 +101,16 @@ function placeInstance(
   mesh.setMatrixAt(index, dummy.matrix);
 }
 
-function finishInstances(mesh: InstancedMesh) {
+function finish(mesh: InstancedMesh) {
   mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) {
-    mesh.instanceColor.needsUpdate = true;
-  }
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   mesh.computeBoundingSphere();
 }
 
 function tileEvents(tiles: Tile[], { onTileHover, onTileClick }: TileHandlers) {
-  if (!onTileHover && !onTileClick) {
-    return {};
-  }
-
+  if (!onTileHover && !onTileClick) return {};
   const pick = (event: ThreeEvent<PointerEvent | MouseEvent>) =>
     event.instanceId === undefined ? undefined : tiles[event.instanceId];
-
   return {
     onPointerMove: (event: ThreeEvent<PointerEvent>) => {
       event.stopPropagation();
@@ -120,18 +130,16 @@ function tileEvents(tiles: Tile[], { onTileHover, onTileClick }: TileHandlers) {
 
 function Ground(handlers: TileHandlers) {
   const ref = useRef<InstancedMesh>(null);
-
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
     LAND.forEach((tile, i) => {
       const [x, z] = toWorld(tile.x, tile.y);
-      placeInstance(mesh, i, [x, -0.25, z]);
+      place(mesh, i, [x, -0.25, z]);
       mesh.setColorAt(i, landColor(tile));
     });
-    finishInstances(mesh);
+    finish(mesh);
   }, []);
-
   return (
     <instancedMesh
       ref={ref}
@@ -139,16 +147,13 @@ function Ground(handlers: TileHandlers) {
       receiveShadow
       {...tileEvents(LAND, handlers)}
     >
-      <boxGeometry args={[0.96, 0.5, 0.96]} />
-      <meshStandardMaterial roughness={0.95} />
+      <boxGeometry args={[1, 0.5, 1]} />
+      <meshStandardMaterial roughness={0.95} flatShading />
     </instancedMesh>
   );
 }
 
-function Water({
-  pollution,
-  ...handlers
-}: { pollution: number } & TileHandlers) {
+function Water({ murk, ...handlers }: { murk: number } & TileHandlers) {
   const animate = useContext(MotionContext);
   const ref = useRef<InstancedMesh>(null);
   const material = useRef<MeshStandardMaterial>(null);
@@ -158,20 +163,21 @@ function Water({
     if (!mesh) return;
     WATER.forEach((tile, i) => {
       const [x, z] = toWorld(tile.x, tile.y);
-      placeInstance(mesh, i, [x, -0.3, z]);
+      place(mesh, i, [x, -0.3, z]);
     });
-    finishInstances(mesh);
+    finish(mesh);
   }, []);
 
   useLayoutEffect(() => {
     material.current?.color
       .copy(CLEAN_WATER)
-      .lerp(DIRTY_WATER, Math.min(Math.max(pollution, 0), 1));
-  }, [pollution]);
+      .lerp(DIRTY_WATER, Math.min(Math.max(murk, 0), 1));
+  }, [murk]);
 
   useFrame(({ clock }) => {
-    if (!animate || !ref.current) return;
-    ref.current.position.y = Math.sin(clock.elapsedTime * 1.3) * 0.015;
+    if (animate && ref.current) {
+      ref.current.position.y = Math.sin(clock.elapsedTime * 1.3) * 0.015;
+    }
   });
 
   return (
@@ -187,39 +193,43 @@ function Water({
         roughness={0.2}
         metalness={0.1}
         transparent
-        opacity={0.9}
+        opacity={0.92}
       />
     </instancedMesh>
   );
 }
 
-function Trees() {
+// Trees thin out as their woods are cut, in 10% steps.
+function Trees({
+  fullness,
+}: {
+  fullness: Record<"westWoods" | "eastWoods", number>;
+}) {
   const trunks = useRef<InstancedMesh>(null);
   const crowns = useRef<InstancedMesh>(null);
+  const west = Math.round(fullness.westWoods * 10) / 10;
+  const east = Math.round(fullness.eastWoods * 10) / 10;
 
   useLayoutEffect(() => {
     const trunkMesh = trunks.current;
     const crownMesh = crowns.current;
     if (!trunkMesh || !crownMesh) return;
     TREES.forEach((tree, i) => {
-      placeInstance(
-        trunkMesh,
-        i,
-        [tree.x, 0.12 * tree.scale, tree.z],
-        tree.scale,
-      );
-      placeInstance(
+      const share = tree.commons === "westWoods" ? west : east;
+      const scale = tree.rank < share + 0.05 ? tree.scale : 0;
+      place(trunkMesh, i, [tree.x, 0.12 * tree.scale, tree.z], scale);
+      place(
         crownMesh,
         i,
         [tree.x, 0.52 * tree.scale, tree.z],
-        tree.scale,
+        scale,
         tree.scale * 9,
       );
       crownMesh.setColorAt(i, scratch.set(tree.color));
     });
-    finishInstances(trunkMesh);
-    finishInstances(crownMesh);
-  }, []);
+    finish(trunkMesh);
+    finish(crownMesh);
+  }, [west, east]);
 
   return (
     <group>
@@ -246,8 +256,6 @@ function Trees() {
 
 function Rocks() {
   const ref = useRef<InstancedMesh>(null);
-  const count = DEPOSITS.length * 3;
-
   useLayoutEffect(() => {
     const mesh = ref.current;
     if (!mesh) return;
@@ -257,7 +265,7 @@ function Rocks() {
         tile.kind === "clay" ? ROCK_COLORS.clay : ROCK_COLORS.copper;
       for (let i = 0; i < 3; i++) {
         const scale = 0.7 + hash(tile.x, tile.y, 20 + i) * 0.6;
-        placeInstance(
+        place(
           mesh,
           t * 3 + i,
           [
@@ -271,13 +279,12 @@ function Rocks() {
         mesh.setColorAt(t * 3 + i, scratch.set(colors[i] ?? "#999999"));
       }
     });
-    finishInstances(mesh);
+    finish(mesh);
   }, []);
-
   return (
     <instancedMesh
       ref={ref}
-      args={[undefined, undefined, count]}
+      args={[undefined, undefined, DEPOSITS.length * 3]}
       castShadow
       receiveShadow
     >
@@ -287,29 +294,28 @@ function Rocks() {
   );
 }
 
-const CLOUDS = Array.from({ length: 6 }, (_, i) => ({
-  x: -13 + i * 5 + hash(i, 1) * 3,
-  y: 5.5 + hash(i, 2) * 1.5,
+// Only on the join-page backdrop: soft clouds drifting high above the map.
+const CLOUDS = Array.from({ length: 5 }, (_, i) => ({
+  x: -13 + i * 6 + hash(i, 1) * 3,
+  y: 7 + hash(i, 2),
   z: -8 + hash(i, 3) * 16,
-  speed: 0.18 + hash(i, 4) * 0.18,
-  scale: 0.55 + hash(i, 5) * 0.35,
+  speed: 0.2 + hash(i, 4) * 0.15,
+  scale: 0.55 + hash(i, 5) * 0.3,
 }));
 
-function Clouds() {
+export function Clouds() {
   const animate = useContext(MotionContext);
   const refs = useRef<(Group | null)[]>([]);
-
   useFrame(({ clock }) => {
     if (!animate) return;
     refs.current.forEach((cloud, i) => {
       const spec = CLOUDS[i];
-      if (!cloud || !spec) return;
-      // Drift across and wrap around, so clouds keep passing over the map.
-      cloud.position.x =
-        ((spec.x + clock.elapsedTime * spec.speed + 15) % 30) - 15;
+      if (cloud && spec) {
+        cloud.position.x =
+          ((spec.x + clock.elapsedTime * spec.speed + 15) % 30) - 15;
+      }
     });
   });
-
   return (
     <group>
       {CLOUDS.map((cloud, i) => (
@@ -321,21 +327,21 @@ function Clouds() {
           position={[cloud.x, cloud.y, cloud.z]}
           scale={cloud.scale}
         >
-          {[
-            [0, 0, 0, 0.6],
-            [0.55, -0.1, 0.1, 0.45],
-            [-0.5, -0.12, -0.05, 0.42],
-            [0.1, 0.25, -0.1, 0.4],
-          ].map(([x = 0, y = 0, z = 0, r = 0.5], j) => (
-            <mesh key={j} position={[x, y, z]} castShadow>
-              <icosahedronGeometry args={[r, 0]} />
-              <meshStandardMaterial
-                color="#ffffff"
-                flatShading
-                transparent
-                opacity={0.85}
-              />
-            </mesh>
+          {(
+            [
+              [0, 0, 0, 0.6],
+              [0.55, -0.1, 0.1, 0.45],
+              [-0.5, -0.12, -0.05, 0.42],
+            ] as const
+          ).map(([x, y, z, r], j) => (
+            <Ball
+              key={j}
+              radius={r}
+              detail={0}
+              position={[x, y, z]}
+              color="#ffffff"
+              opacity={0.85}
+            />
           ))}
         </group>
       ))}
@@ -344,9 +350,17 @@ function Clouds() {
 }
 
 export function Terrain({
-  waterPollution,
+  commons,
   ...handlers
-}: { waterPollution: number } & TileHandlers) {
+}: { commons: CommonsView[] } & TileHandlers) {
+  const river = commons.find((c) => c.id === "river");
+  const fullness = useMemo(() => {
+    const share = (id: "westWoods" | "eastWoods") =>
+      (commons.find((c) => c.id === id)?.stocks.wood ?? 0) /
+      (COMMONS[id].stocks.wood?.cap ?? 1);
+    return { westWoods: share("westWoods"), eastWoods: share("eastWoods") };
+  }, [commons]);
+
   return (
     <group>
       {/* The island the map sits on. */}
@@ -359,10 +373,9 @@ export function Terrain({
         <meshStandardMaterial color="#6d5137" roughness={1} />
       </mesh>
       <Ground {...handlers} />
-      <Water pollution={waterPollution} {...handlers} />
-      <Trees />
+      <Water murk={(river?.pollution ?? 0) / 40} {...handlers} />
+      <Trees fullness={fullness} />
       <Rocks />
-      <Clouds />
     </group>
   );
 }

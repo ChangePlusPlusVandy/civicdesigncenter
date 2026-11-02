@@ -84,6 +84,12 @@ export interface Leaderboard {
   ranking: { cityId: CityId; value: number }[];
 }
 
+export interface RosterEntry {
+  playerId: string;
+  name: string;
+  cityId: CityId;
+}
+
 export interface Projection {
   version: number;
   audience: Audience["kind"];
@@ -96,6 +102,7 @@ export interface Projection {
   myCity: PrivateCity | null;
   // Teacher only.
   allCities: PrivateCity[] | null;
+  roster: RosterEntry[] | null;
   commons: CommonsView[];
   regionHealth: number;
   market: Record<Good, { stock: number; buy: number; sell: number }>;
@@ -187,8 +194,12 @@ export function project(
   state: IdleState,
   audience: Audience,
   version: number,
-  playersByCity: Partial<Record<CityId, string[]>>,
+  players: RosterEntry[],
 ): Projection {
+  const playersByCity: Partial<Record<CityId, string[]>> = {};
+  for (const player of players) {
+    (playersByCity[player.cityId] ??= []).push(player.name);
+  }
   const cityStates = state.cityIds
     .map((id) => state.cities[id])
     .filter((city): city is CityState => city !== undefined);
@@ -243,6 +254,7 @@ export function project(
             privateCity(state, city, playersByCity[city.id] ?? []),
           )
         : null,
+    roster: audience.kind === "teacher" ? players : null,
     commons: (Object.keys(state.commons) as CommonsId[]).map((id) => ({
       id,
       name: COMMONS_NAMES[id],

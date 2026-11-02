@@ -1,5 +1,5 @@
 import { createContext, useEffect, useState } from "react";
-import { MAP_HEIGHT, MAP_WIDTH } from "./map";
+import { MAP_HEIGHT, MAP_WIDTH } from "@cs/idle";
 
 // Grid cell (x, y) -> world (x, z). The map is centered on the origin and the
 // top of every land tile sits at y = 0.
@@ -26,4 +26,10 @@ export function usePrefersReducedMotion(): boolean {
   }, []);
 
   return reduced;
+}
+
+// Deterministic per-tile noise, so the map looks the same on every device.
+export function hash(x: number, y: number, salt = 0): number {
+  const value = Math.sin(x * 127.1 + y * 311.7 + salt * 74.7) * 43758.5453;
+  return value - Math.floor(value);
 }

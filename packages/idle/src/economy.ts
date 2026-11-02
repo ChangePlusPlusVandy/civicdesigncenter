@@ -14,6 +14,7 @@ import {
   UPGRADE_COPPER,
   UPGRADE_COST_FACTOR,
   type BuildableKind,
+  type BuildingKind,
   type Bundle,
   type Good,
 } from "./content.ts";
@@ -24,7 +25,6 @@ import {
   neighborOfKind,
   neighbors,
   tileAt,
-  type CityId,
   type CommonsId,
 } from "./map.ts";
 import type { Building, CityState, IdleState, RuleError } from "./types.ts";
@@ -47,7 +47,10 @@ export function upgradeCost(kind: BuildableKind, toLevel: number): Bundle {
   return cost;
 }
 
-export function canAfford(city: CityState, cost: Bundle): boolean {
+export function canAfford(
+  city: Pick<CityState, "coins" | "goods">,
+  cost: Bundle,
+): boolean {
   return Object.entries(cost).every(([key, amount]) =>
     key === "coins"
       ? city.coins >= (amount ?? 0)
@@ -55,7 +58,10 @@ export function canAfford(city: CityState, cost: Bundle): boolean {
   );
 }
 
-export function missing(city: CityState, cost: Bundle): string {
+export function missing(
+  city: Pick<CityState, "coins" | "goods">,
+  cost: Bundle,
+): string {
   return Object.entries(cost)
     .filter(([key, amount]) =>
       key === "coins"
@@ -107,6 +113,12 @@ export function commonsNextTo(x: number, y: number): CommonsId | undefined {
   return neighbors(x, y).find((tile) => tile.commons)?.commons;
 }
 
+// Whether a building of this kind would get its terrain bonus at (x, y).
+export function hasBonusAt(kind: BuildingKind, x: number, y: number): boolean {
+  const near = BUILDINGS[kind].bonus?.near;
+  return near ? neighborOfKind(x, y, near) !== undefined : false;
+}
+
 export interface Rates {
   output: Partial<Record<Good, number>>;
   pollution: number;
@@ -121,9 +133,7 @@ export function buildingRates(state: IdleState, building: Building): Rates {
   const def = BUILDINGS[building.kind];
   const outputScale = level(LEVEL_OUTPUT, building.level);
   const pollutionScale = level(LEVEL_POLLUTION, building.level);
-  const bonusActive = def.bonus
-    ? neighborOfKind(building.x, building.y, def.bonus.near) !== undefined
-    : false;
+  const bonusActive = hasBonusAt(building.kind, building.x, building.y);
 
   let outputFactor = outputScale;
   let pollutionFactor = pollutionScale;
@@ -326,17 +336,20 @@ export function regionHealth(state: IdleState): number {
   );
 }
 
+// Only needs the building city's own data, so the browser can run the same
+// check the server does before a student taps a tile.
+export type BuildingCity = Pick<
+  CityState,
+  "id" | "coins" | "goods" | "buildings"
+>;
+
 export function placementProblem(
-  state: IdleState,
-  cityId: CityId,
+  city: BuildingCity,
   kind: BuildableKind,
   x: number,
   y: number,
 ): RuleError | null {
-  const city = state.cities[cityId];
   const def = BUILDINGS[kind];
-  if (!city)
-    return { code: "NOT_FOUND", message: "Your city isn't in this game." };
   if (!tileAt(x, y))
     return { code: "BAD_REQUEST", message: "That's off the map." };
 
@@ -347,7 +360,7 @@ export function placementProblem(
       message: "You can only build inside your city's fence.",
     };
   }
-  if (owner.id !== cityId) {
+  if (owner.id !== city.id) {
     return {
       code: "NOT_YOUR_LAND",
       message: `That land belongs to ${cityInfo(owner.id).name}.`,

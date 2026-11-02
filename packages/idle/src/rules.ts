@@ -263,7 +263,7 @@ function build(
   ) {
     return fail("BAD_REQUEST", "Pick a building and a tile.");
   }
-  const problem = placementProblem(state, city.id, kind, x, y);
+  const problem = placementProblem(city, kind, x, y);
   if (problem) return { ok: false, error: problem };
 
   const building: Building = {

@@ -2,50 +2,54 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { DeviceGate } from "@/components/DeviceGate";
-import { DebugPage } from "@/pages/DebugPage";
 import { HomePage } from "@/pages/HomePage";
 import { JoinPage } from "@/pages/JoinPage";
-import {
-  CityPage,
-  NotFoundPage,
-  PlayerPage,
-  ProjectorPage,
-  TeachGamePage,
-  TeachPage,
-} from "@/pages/RoutePages";
+import { NotFoundPage } from "@/pages/NotFoundPage";
 
-// Keeps three.js out of the main bundle.
-const WorldPrototypePage = lazy(() =>
-  import("@/pages/WorldPrototypePage").then((module) => ({
-    default: module.WorldPrototypePage,
-  })),
+// Game screens load on demand so the home and join pages stay small; the
+// socket client and game rules come with them.
+const PlayPage = lazy(() =>
+  import("@/pages/PlayPage").then((m) => ({ default: m.PlayPage })),
+);
+const TeachHomePage = lazy(() =>
+  import("@/pages/TeachPages").then((m) => ({ default: m.TeachHomePage })),
+);
+const TeacherConsolePage = lazy(() =>
+  import("@/pages/TeachPages").then((m) => ({ default: m.TeacherConsolePage })),
+);
+const ProjectorPage = lazy(() =>
+  import("@/pages/ProjectorPage").then((m) => ({ default: m.ProjectorPage })),
+);
+const DebugPage = lazy(() =>
+  import("@/pages/DebugPage").then((m) => ({ default: m.DebugPage })),
+);
+const LabPage = lazy(() =>
+  import("@/pages/LabPage").then((m) => ({ default: m.LabPage })),
 );
 
 function App() {
   return (
     <DeviceGate>
       <BrowserRouter>
-        <Routes>
-          <Route path="debug/:code" element={<DebugPage />} />
-          <Route
-            path="prototype/world"
-            element={
-              <Suspense fallback={null}>
-                <WorldPrototypePage />
-              </Suspense>
-            }
-          />
-          <Route element={<AppLayout />}>
-            <Route index element={<HomePage />} />
-            <Route path="join" element={<JoinPage />} />
-            <Route path="play/:code" element={<PlayerPage />} />
-            <Route path="city/:code" element={<CityPage />} />
+        <Suspense fallback={null}>
+          <Routes>
+            <Route path="play/:code" element={<PlayPage />} />
+            {/* A team's shared device plays the same view. */}
+            <Route path="city/:code" element={<PlayPage />} />
+            <Route path="teach/:code" element={<TeacherConsolePage />} />
             <Route path="projector/:code" element={<ProjectorPage />} />
-            <Route path="teach" element={<TeachPage />} />
-            <Route path="teach/:gameId" element={<TeachGamePage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
+            <Route path="debug/:code" element={<DebugPage />} />
+            {import.meta.env.DEV ? (
+              <Route path="dev/lab" element={<LabPage />} />
+            ) : null}
+            <Route element={<AppLayout />}>
+              <Route index element={<HomePage />} />
+              <Route path="join" element={<JoinPage />} />
+              <Route path="teach" element={<TeachHomePage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </DeviceGate>
   );

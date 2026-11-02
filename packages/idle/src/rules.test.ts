@@ -365,7 +365,7 @@ describe("projection", () => {
       state,
       { kind: "player", cityId: "green", playerId: "p1", name: "Ana" },
       7,
-      { green: ["Ana"] },
+      [{ playerId: "p1", name: "Ana", cityId: "green" }],
     );
     expect(view.version).toBe(7);
     expect(view.myCity?.coins).toBe(START.coins);
@@ -373,7 +373,7 @@ describe("projection", () => {
     expect(JSON.stringify(view.cities)).not.toContain('"coins"');
     expect(view.cities.find((c) => c.id === "green")?.players).toEqual(["Ana"]);
 
-    const teacherView = project(state, { kind: "teacher" }, 7, {});
+    const teacherView = project(state, { kind: "teacher" }, 7, []);
     expect(teacherView.allCities).toHaveLength(5);
   });
 });
