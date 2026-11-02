@@ -62,3 +62,28 @@ export function joinGame(code: string, name: string): Promise<JoinResponse> {
     body: JSON.stringify({ name }),
   });
 }
+
+export type ExportFile =
+  "activity.csv" | "reflections.csv" | "cities.csv" | "events.csv" | "all.json";
+
+// Downloads one of the teacher's exports. It needs the teacher token in a
+// header, so it's fetched and saved here rather than linked.
+export async function downloadExport(
+  code: string,
+  teacherToken: string,
+  file: ExportFile,
+): Promise<void> {
+  const res = await fetch(
+    `${API_URL}/api/sandbox/games/${encodeURIComponent(code)}/export/${file}`,
+    { headers: { authorization: `Bearer ${teacherToken}` } },
+  ).catch(() => null);
+  if (!res?.ok) {
+    throw new RequestError("EXPORT", "Couldn't download that. Try again.");
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `citysettlers-${code}-${file}`;
+  link.click();
+  URL.revokeObjectURL(url);
+}

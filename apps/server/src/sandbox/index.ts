@@ -22,6 +22,7 @@ import {
 } from "@cs/idle";
 import { normalizeRoomCode } from "@cs/shared";
 import { GameRoom, type Identity } from "./room.ts";
+import { EXPORT_KINDS, exportCsv, type ExportKind } from "./export.ts";
 import { MemoryStore, type GameStore } from "./store.ts";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -213,6 +214,51 @@ export class Sandbox {
       }
       await this.save();
       res.json(await this.store.loadEvents(room.code));
+    });
+
+    // Teacher downloads: CSVs for spreadsheets, or everything as JSON.
+    router.get("/games/:code/export/:kind", async (req, res) => {
+      const room = this.teacherRoom(req);
+      const kind = req.params.kind;
+      if (!room) {
+        res
+          .status(404)
+          .json({ error: "NO_GAME", message: "No game, or not your game." });
+        return;
+      }
+      await this.save();
+      const events = await this.store.loadEvents(room.code);
+      const roster = room.roster();
+      if (kind === "all.json") {
+        res
+          .type("application/json")
+          .attachment(`citysettlers-${room.code}.json`)
+          .send(
+            JSON.stringify(
+              {
+                code: room.code,
+                exportedAt: new Date().toISOString(),
+                state: room.state,
+                roster,
+                events,
+              },
+              null,
+              2,
+            ),
+          );
+        return;
+      }
+      const csvKind = kind.replace(/\.csv$/, "");
+      if (!EXPORT_KINDS.includes(csvKind as ExportKind)) {
+        res
+          .status(404)
+          .json({ error: "NOT_FOUND", message: "Unknown export." });
+        return;
+      }
+      res
+        .type("text/csv")
+        .attachment(`citysettlers-${room.code}-${csvKind}.csv`)
+        .send(exportCsv(csvKind as ExportKind, room.state, roster, events));
     });
 
     return router;

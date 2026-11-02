@@ -1,5 +1,12 @@
 import { lazy, Suspense, useMemo, useState, type FormEvent } from "react";
-import { ExternalLink, LoaderCircle, Pause, Play, Square } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  LoaderCircle,
+  Pause,
+  Play,
+  Square,
+} from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   EVENTS,
@@ -18,7 +25,7 @@ import {
 } from "@cs/idle";
 import { normalizeRoomCode } from "@cs/shared";
 import { Button } from "@/components/ui/button";
-import { createGame } from "@/game/api";
+import { createGame, downloadExport, type ExportFile } from "@/game/api";
 import {
   ContributionChips,
   Leaderboards,
@@ -215,15 +222,47 @@ export function TeacherConsolePage() {
       </main>
     );
   }
-  return <Console code={code} game={game} state={game.state} />;
+  return (
+    <Console code={code} token={session.token} game={game} state={game.state} />
+  );
 }
+
+const EXPORTS: { file: ExportFile; label: string; note: string }[] = [
+  {
+    file: "activity.csv",
+    label: "Student activity",
+    note: "What each student built, traded and voted (with names).",
+  },
+  {
+    file: "reflections.csv",
+    label: "Reflections",
+    note: "Every answer, by season, city and student.",
+  },
+  {
+    file: "cities.csv",
+    label: "City trends",
+    note: "People, happiness and pollution over time.",
+  },
+  {
+    file: "events.csv",
+    label: "Event log",
+    note: "Every action, with anonymous student IDs, for research.",
+  },
+  {
+    file: "all.json",
+    label: "Everything (JSON)",
+    note: "The whole game, for analysis tools.",
+  },
+];
 
 function Console({
   code,
+  token,
   game,
   state,
 }: {
   code: string;
+  token: string;
   game: GameConnection;
   state: Projection;
 }) {
@@ -615,6 +654,44 @@ function Console({
           <section className={cn(panel, "p-4 shadow-sm")}>
             <Section title="Leaderboards">
               <Leaderboards game={state} />
+            </Section>
+          </section>
+
+          <section className={cn(panel, "p-4 shadow-sm")}>
+            <Section title="Download class data">
+              <ul className="space-y-1.5">
+                {EXPORTS.map(({ file, label, note }) => (
+                  <li key={file}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await downloadExport(code, token, file);
+                        } catch (error) {
+                          push(
+                            error instanceof Error
+                              ? error.message
+                              : "Download failed.",
+                            "bad",
+                          );
+                        }
+                      }}
+                      className="flex w-full items-start gap-2 rounded-lg border p-2 text-left text-sm hover:bg-secondary"
+                    >
+                      <Download
+                        className="mt-0.5 size-4 shrink-0 text-primary"
+                        aria-hidden="true"
+                      />
+                      <span>
+                        <span className="font-semibold">{label}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {note}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </Section>
           </section>
 
