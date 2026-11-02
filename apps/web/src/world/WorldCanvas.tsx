@@ -1,12 +1,19 @@
-import { useContext, useEffect, useLayoutEffect, useRef } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { MapControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { Vector3 } from "three";
-import { riverMurk, type PlacedBuilding, type Tile } from "./map";
+import {
+  cityInfo,
+  type CityId,
+  type CommonsView,
+  type PublicCity,
+  type Tile,
+} from "@cs/idle";
+import { Badge, LabelLayer, LabelTracker, Popup, type Label } from "./Labels";
 import { TileMarkers, type PlacementCell } from "./Markers";
-import { MotionContext, usePrefersReducedMotion } from "./scene";
+import { MotionContext, toWorld, usePrefersReducedMotion } from "./scene";
 import { Settlements } from "./Settlements";
-import { Terrain, type TileHandlers } from "./Terrain";
+import { Clouds, Terrain, type TileHandlers } from "./Terrain";
 
 // Locked, angled orthographic camera: 45° around the map, 55° down. Steep
 // enough that every tile stays easy to read and tap, shallow enough to show
@@ -53,27 +60,48 @@ interface ControlsLike {
 }
 
 // Pan and zoom only; rotation snaps in quarter turns so nobody gets lost.
-function InteractiveCamera({ quarterTurns }: { quarterTurns: number }) {
+// With `focus`, starts zoomed in on that city.
+function InteractiveCamera({
+  quarterTurns,
+  focus,
+}: {
+  quarterTurns: number;
+  focus?: CityId;
+}) {
   const animate = useContext(MotionContext);
   const get = useThree((state) => state.get);
   const size = useThree((state) => state.size);
   const invalidate = useThree((state) => state.invalidate);
   const controls = useThree((state) => state.controls) as ControlsLike | null;
   const yaw = useRef(BASE_YAW);
+  const focused = useRef(false);
   // Leave room for the panels above and below the map.
   const fit = Math.min(size.width / 26, size.height / 22);
 
   useLayoutEffect(() => {
     const { camera } = get();
-    camera.zoom = fit;
+    camera.zoom = focus ? fit * 1.9 : fit;
     camera.updateProjectionMatrix();
-  }, [get, fit]);
+  }, [get, fit, focus]);
 
   useEffect(() => invalidate(), [quarterTurns, invalidate]);
 
   useFrame(({ camera }, delta) => {
     if (!controls) return;
     const { target } = controls;
+
+    if (focus && !focused.current) {
+      focused.current = true;
+      const { plot } = cityInfo(focus);
+      const [x, z] = toWorld(
+        plot.x + (plot.width - 1) / 2,
+        plot.y + (plot.height - 1) / 2,
+      );
+      target.set(x, 0, z);
+      camera.position.set(...orbit(yaw.current, x, z));
+      camera.lookAt(target);
+      controls.update();
+    }
 
     const x = Math.min(Math.max(target.x, -PAN_LIMIT), PAN_LIMIT);
     const z = Math.min(Math.max(target.z, -PAN_LIMIT), PAN_LIMIT);
@@ -107,6 +135,39 @@ function InteractiveCamera({ quarterTurns }: { quarterTurns: number }) {
   );
 }
 
+// Badges for every building in the viewer's city, plus a popup for each one
+// that produced something on the last tick (re-keyed by tick to replay).
+function cityLabels(
+  cities: PublicCity[],
+  myCityId: CityId | undefined,
+  tick: number,
+  animate: boolean,
+): Label[] {
+  const city = cities.find((c) => c.id === myCityId);
+  if (!city) return [];
+  return city.buildings.flatMap((building) => {
+    const [x, z] = toWorld(building.x, building.y);
+    const labels: Label[] = [
+      {
+        id: `${building.id}-badge`,
+        position: [x, 1.15, z],
+        node: <Badge building={building} />,
+      },
+    ];
+    const produced = Object.values(building.lastOutput).some(
+      (amount) => (amount ?? 0) > 0,
+    );
+    if (animate && produced) {
+      labels.push({
+        id: `${building.id}-popup`,
+        position: [x, 0.7, z],
+        node: <Popup key={tick} building={building} />,
+      });
+    }
+    return labels;
+  });
+}
+
 function Lights() {
   return (
     <>
@@ -131,9 +192,11 @@ function Lights() {
 
 export interface WorldCanvasProps extends TileHandlers {
   mode: "backdrop" | "interactive";
-  buildings: PlacedBuilding[];
-  pollution: Record<string, number>;
-  freshIds?: ReadonlySet<string>;
+  cities: PublicCity[];
+  commons: CommonsView[];
+  tick: number;
+  // The viewer's own city: badges and popups, and the camera starts there.
+  myCityId?: CityId;
   hovered?: Tile | null;
   selected?: Tile | null;
   placementCells?: PlacementCell[];
@@ -143,9 +206,10 @@ export interface WorldCanvasProps extends TileHandlers {
 
 export function WorldCanvas({
   mode,
-  buildings,
-  pollution,
-  freshIds,
+  cities,
+  commons,
+  tick,
+  myCityId,
   hovered,
   selected,
   placementCells,
@@ -156,44 +220,54 @@ export function WorldCanvas({
 }: WorldCanvasProps) {
   const animate = !usePrefersReducedMotion();
   const interactive = mode === "interactive";
+  const labelElements = useRef(new Map<string, HTMLElement>());
+  const labels = useMemo(
+    () => cityLabels(cities, myCityId, tick, animate),
+    [cities, myCityId, tick, animate],
+  );
 
   return (
-    <Canvas
-      orthographic
-      shadows
-      flat
-      dpr={[1, 1.5]}
-      frameloop={animate ? "always" : "demand"}
-      gl={{ antialias: true, alpha: true }}
-      camera={{ position: orbit(BASE_YAW), zoom: 40, near: 0.1, far: 200 }}
-      style={interactive ? { touchAction: "none" } : { pointerEvents: "none" }}
-      onCreated={() => onReady?.()}
-    >
-      <MotionContext.Provider value={animate}>
-        <Lights />
-        {interactive ? (
-          <InteractiveCamera quarterTurns={quarterTurns} />
-        ) : (
-          <BackdropCamera />
-        )}
-        <Terrain
-          waterPollution={riverMurk(pollution)}
-          onTileHover={interactive ? onTileHover : undefined}
-          onTileClick={interactive ? onTileClick : undefined}
-        />
-        <Settlements
-          buildings={buildings}
-          pollution={pollution}
-          freshIds={freshIds}
-        />
-        {interactive ? (
-          <TileMarkers
-            hovered={hovered}
-            selected={selected}
-            placementCells={placementCells}
+    <div className="relative h-full w-full">
+      <Canvas
+        orthographic
+        shadows
+        flat
+        dpr={[1, 1.5]}
+        frameloop={animate ? "always" : "demand"}
+        gl={{ antialias: true, alpha: true }}
+        camera={{ position: orbit(BASE_YAW), zoom: 40, near: 0.1, far: 200 }}
+        style={
+          interactive ? { touchAction: "none" } : { pointerEvents: "none" }
+        }
+        onCreated={() => onReady?.()}
+      >
+        <MotionContext.Provider value={animate}>
+          <Lights />
+          {interactive ? (
+            <InteractiveCamera quarterTurns={quarterTurns} focus={myCityId} />
+          ) : (
+            <>
+              <BackdropCamera />
+              <Clouds />
+            </>
+          )}
+          <Terrain
+            commons={commons}
+            onTileHover={interactive ? onTileHover : undefined}
+            onTileClick={interactive ? onTileClick : undefined}
           />
-        ) : null}
-      </MotionContext.Provider>
-    </Canvas>
+          <Settlements cities={cities} />
+          <LabelTracker labels={labels} elements={labelElements} />
+          {interactive ? (
+            <TileMarkers
+              hovered={hovered}
+              selected={selected}
+              placementCells={placementCells}
+            />
+          ) : null}
+        </MotionContext.Provider>
+      </Canvas>
+      <LabelLayer labels={labels} elements={labelElements} />
+    </div>
   );
 }

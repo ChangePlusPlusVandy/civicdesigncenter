@@ -26,7 +26,7 @@ function buildAnywhere(
   kind: BuildableKind,
 ): Intent | null {
   const tile = plotTiles(cityInfo(city.id)).find(
-    ({ x, y }) => placementProblem(state, city.id, kind, x, y) === null,
+    ({ x, y }) => placementProblem(city, kind, x, y) === null,
   );
   return tile
     ? { type: "build", payload: { kind, x: tile.x, y: tile.y } }
@@ -199,7 +199,8 @@ describe("simulation", () => {
           },
         };
         return plotTiles(cityInfo(id)).some(
-          ({ x, y }) => placementProblem(rich, id, kind, x, y) === null,
+          ({ x, y }) =>
+            placementProblem(rich.cities[id] as CityState, kind, x, y) === null,
         );
       });
       expect(somewhere, kind).toBe(true);

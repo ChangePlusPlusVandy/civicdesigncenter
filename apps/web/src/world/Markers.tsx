@@ -1,7 +1,7 @@
 import { useContext, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import type { Group } from "three";
-import type { Tile } from "./map";
+import type { Tile } from "@cs/idle";
 import { MotionContext, toWorld } from "./scene";
 
 export interface PlacementCell {

@@ -13,6 +13,7 @@ import {
   type IdleState,
   type LoggedEvent,
   type Projection,
+  type RosterEntry,
 } from "@cs/idle";
 
 export interface Player {
@@ -217,16 +218,12 @@ export class GameRoom {
     return this.players.get(token);
   }
 
-  roster(): Player[] {
-    return [...this.players.values()];
-  }
-
-  playersByCity(): Partial<Record<CityId, string[]>> {
-    const byCity: Partial<Record<CityId, string[]>> = {};
-    for (const player of this.players.values()) {
-      (byCity[player.cityId] ??= []).push(player.name);
-    }
-    return byCity;
+  roster(): RosterEntry[] {
+    return [...this.players.values()].map((player) => ({
+      playerId: player.id,
+      name: player.name,
+      cityId: player.cityId,
+    }));
   }
 
   projectionFor(identity: Identity): Projection {
@@ -239,7 +236,7 @@ export class GameRoom {
             name: identity.player.name,
           }
         : { kind: identity.kind };
-    return project(this.state, audience, this.version, this.playersByCity());
+    return project(this.state, audience, this.version, this.roster());
   }
 
   // Events a given audience may see: their own city's and game-wide ones.
