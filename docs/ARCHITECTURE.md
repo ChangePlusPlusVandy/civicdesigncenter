@@ -22,7 +22,7 @@ facilitator console.
 ```
 apps/web/          React client
 apps/server/       Express + Socket.IO game server; serves apps/web/dist in production
-packages/engine/   reduce(scenario, state, action) -> { state, events } | RuleError
+packages/engine/   reduce(scenario, state, action) -> { ok: true, state, events } | { ok: false, error: RuleError }
 packages/shared/   zod schemas and types: actions, socket events, projections, scenario
 scenarios/         scenario JSON (lc2-default.json for engine work, nashville-v1.json for the MVP)
 ```
@@ -40,7 +40,7 @@ server  auth middleware          -> actor { player | teacher, gameId, participan
         per-game mutex           -> one action at a time per game
         zod validation
         can(role, action.type)   -> no? ack({ ok: false, code: 'FORBIDDEN' })
-        engine.reduce(...)       -> RuleError? ack({ ok: false, code })
+        engine.reduce(...)       -> !ok? ack({ ok: false, code: error.code })
         DB transaction           -> insert events; update snapshot WHERE version = v (then v + 1)
         broadcast                -> each audience gets its full projected state
         ack({ ok: true, version })
