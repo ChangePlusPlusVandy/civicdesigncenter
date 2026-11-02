@@ -7,7 +7,7 @@ async function joinAs(
 ): Promise<Page> {
   const page = await (await browser.newContext()).newPage();
   await page.goto(`/join?code=${code}`);
-  await page.getByLabel("Username").fill(name);
+  await page.getByLabel("Your name").fill(name);
   await page.getByRole("button", { name: "Join game" }).click();
   await expect(page).toHaveURL(new RegExp(`/play/${code}$`));
   await expect(page.getByText(/You're on/)).toBeVisible();
@@ -64,14 +64,16 @@ test("a teacher and two students play one game together", async ({
   await teacher.getByRole("button", { name: "Call a Town Meeting" }).click();
   for (const student of [ana, ben]) {
     await expect(
-      student.getByRole("heading", { name: /Time to vote/ }),
+      student.getByRole("heading", { name: /time to vote/i }),
     ).toBeVisible();
     await student.getByRole("button", { name: /Yes/ }).click();
   }
   await expect(teacher.getByText("2 of 2 cities have voted.")).toBeVisible();
   await teacher.getByRole("button", { name: /Close voting/ }).click();
   for (const student of [ana, ben]) {
-    await expect(student.getByText("Season 1 report")).toBeVisible();
+    await expect(
+      student.getByRole("heading", { name: /in season 1\?/ }),
+    ).toBeVisible();
   }
 
   // Ana answers the reflection question; the teacher reads it.

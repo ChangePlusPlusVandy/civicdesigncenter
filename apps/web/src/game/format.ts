@@ -15,7 +15,11 @@ import {
   type PolicyId,
 } from "@cs/idle";
 
-export const panel = "rounded-xl border bg-card/95 shadow-lg backdrop-blur-md";
+// Floating panels over the 3D world: opaque, with the one soft shadow that
+// separates them from the map. Resting panels on a page use `surface`.
+export const panel =
+  "rounded-2xl border bg-card shadow-[0_2px_12px_rgb(22_36_27/0.08)]";
+export const surface = "rounded-2xl border bg-card";
 
 export const COIN = "🪙";
 

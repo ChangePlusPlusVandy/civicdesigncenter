@@ -50,7 +50,7 @@ export function MarketPanel({
             aria-checked={amount === n}
             onClick={() => setAmount(n)}
             className={cn(
-              "rounded-md px-3 py-1 text-sm font-bold",
+              "rounded-md px-3 py-1 text-sm font-semibold",
               amount === n
                 ? "bg-primary text-primary-foreground"
                 : "bg-secondary",
@@ -67,7 +67,7 @@ export function MarketPanel({
           return (
             <li key={good} className="rounded-lg border p-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-bold">
+                <span className="font-semibold">
                   <span aria-hidden="true">{info.icon}</span> {info.name}
                 </span>
                 <span className="text-xs text-muted-foreground">
@@ -125,7 +125,7 @@ function BundleInputs({
 }) {
   return (
     <fieldset>
-      <legend className="mb-1 text-xs font-bold text-muted-foreground">
+      <legend className="mb-1 text-xs font-semibold text-muted-foreground">
         {label}
       </legend>
       <div className="grid grid-cols-5 gap-1">

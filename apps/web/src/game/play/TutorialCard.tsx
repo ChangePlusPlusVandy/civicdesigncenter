@@ -29,16 +29,13 @@ export function TutorialCard({
   const waiting = action && state.phase !== "running";
   return (
     <section
-      className={cn(
-        panel,
-        "pointer-events-auto w-[22rem] max-w-full border-primary/50 p-4",
-      )}
+      className={cn(panel, "pointer-events-auto w-[22rem] max-w-full p-4")}
       aria-label="Tutorial"
       aria-live="polite"
     >
       <div className="flex items-center justify-between">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
-          First day · step {number} of {total}
+        <p className="text-xs font-semibold text-primary tabular-nums">
+          First day · {number} of {total}
         </p>
         <button
           type="button"
@@ -57,10 +54,10 @@ export function TutorialCard({
           style={{ width: `${(number / total) * 100}%` }}
         />
       </div>
-      <h2 className="mt-3 font-serif text-xl tracking-tight">
+      <h2 className="mt-3 text-lg font-semibold leading-6 tracking-tight">
         {step.title(ctx)}
       </h2>
-      <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">
         {step.body(ctx)}
       </p>
       <div className="mt-3">
@@ -69,7 +66,7 @@ export function TutorialCard({
             {number === total ? "Start playing!" : "Next"}
           </Button>
         ) : waiting ? (
-          <p className="text-sm font-semibold text-[var(--orange)]">
+          <p className="text-sm font-semibold text-warn">
             Try it as soon as your teacher starts the game.
           </p>
         ) : (

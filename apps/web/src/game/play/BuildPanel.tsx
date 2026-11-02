@@ -60,12 +60,12 @@ export function SpotPicker({
 }) {
   const { plot } = map.cityInfo(city.id);
   return (
-    <div className="mb-3 rounded-lg border border-primary/40 bg-primary/5 p-2.5">
+    <div className="mb-3 rounded-xl bg-primary/5 p-3 ring-1 ring-primary/30">
       <p className="text-sm font-semibold">
         Where should the {BUILDINGS[kind].name} go?
       </p>
       <p className="text-xs text-muted-foreground">
-        Tap a green spot here or on the map. ✨ means a bonus.
+        Tap a green spot here or on the map. ✨ marks a bonus.
       </p>
       <div
         className="mx-auto mt-2 grid w-fit gap-1"
@@ -91,7 +91,7 @@ export function SpotPicker({
                   : `Build here: row ${row}, column ${column}${hasBonusAt(map, kind, tile.x, tile.y) ? ", with a bonus" : ""}`
               }
               className={cn(
-                "grid size-10 place-items-center rounded-md text-base",
+                "grid size-10 place-items-center rounded-lg text-base",
                 problem
                   ? "bg-secondary text-muted-foreground"
                   : "bg-primary/80 text-primary-foreground hover:bg-primary",
@@ -123,7 +123,7 @@ export function BuildPanel({
   onPick: (kind: BuildableKind | null) => void;
 }) {
   return (
-    <ul className="space-y-1.5">
+    <ul className="-mx-1">
       {BUILDABLE.map((kind) => {
         const def = BUILDINGS[kind];
         const affordable = canAfford(city, def.cost);
@@ -135,22 +135,45 @@ export function BuildPanel({
               aria-pressed={active}
               onClick={() => onPick(active ? null : kind)}
               className={cn(
-                "flex w-full items-start gap-3 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                active ? "border-primary bg-primary/10" : "hover:bg-secondary",
-                !affordable && !active && "opacity-60",
+                "flex w-full items-start gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                active
+                  ? "bg-primary/10 ring-1 ring-primary/40"
+                  : "hover:bg-secondary",
                 highlight === kind &&
                   !active &&
                   "animate-pulse ring-2 ring-primary",
               )}
             >
-              <span className="text-2xl leading-none" aria-hidden="true">
+              <span
+                className={cn(
+                  "grid size-10 shrink-0 place-items-center rounded-xl bg-secondary text-2xl leading-none",
+                  !affordable && !active && "grayscale-[60%]",
+                )}
+                aria-hidden="true"
+              >
                 {def.icon}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center justify-between gap-2">
-                  <span className="font-bold">{def.name}</span>
+                <span className="flex items-baseline justify-between gap-2">
+                  <span
+                    className={cn(
+                      "font-semibold",
+                      !affordable && !active && "text-muted-foreground",
+                    )}
+                  >
+                    {def.name}
+                  </span>
+                  {active ? (
+                    <span className="text-xs font-semibold text-primary">
+                      Placing…
+                    </span>
+                  ) : !affordable ? (
+                    <span className="text-xs text-muted-foreground">
+                      Can't afford yet
+                    </span>
+                  ) : null}
                 </span>
-                <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                <span className="mt-0.5 block text-sm leading-5 text-muted-foreground">
                   {def.blurb}
                 </span>
                 <span className="mt-1.5 block">
@@ -222,12 +245,12 @@ export function TileDetails({
     <div>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
+          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             {def ? <span aria-hidden="true">{def.icon}</span> : null}
             {title}
             {building && building.kind !== "hall" ? (
               <span
-                className="text-sm text-[var(--orange)]"
+                className="text-sm text-warn"
                 aria-label={`Level ${building.level}`}
               >
                 {"★".repeat(building.level)}

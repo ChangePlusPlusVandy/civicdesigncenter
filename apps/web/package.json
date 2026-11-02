@@ -12,6 +12,7 @@
   "dependencies": {
     "@cs/idle": "*",
     "@cs/shared": "*",
+    "@fontsource-variable/figtree": "^5.3.0",
     "@radix-ui/react-slot": "^1.5.0",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",

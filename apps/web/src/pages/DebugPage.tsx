@@ -33,7 +33,7 @@ export function DebugPage() {
   return (
     <div className="min-h-dvh bg-background p-4 font-mono text-xs">
       <header className="flex flex-wrap items-center gap-3">
-        <Link to="/" className="font-sans font-bold">
+        <Link to="/" className="font-sans font-semibold">
           City Settlers
         </Link>
         <span className="font-sans text-muted-foreground">
@@ -69,13 +69,13 @@ export function DebugPage() {
       ) : null}
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_28rem]">
         <section>
-          <h2 className="mb-2 font-sans text-sm font-bold">Projection</h2>
+          <h2 className="mb-2 font-sans text-sm font-semibold">Projection</h2>
           <pre className="max-h-[80dvh] overflow-auto rounded-lg border bg-card p-3">
             {state ? JSON.stringify(state, null, 2) : "Waiting for state…"}
           </pre>
         </section>
         <section>
-          <h2 className="mb-2 font-sans text-sm font-bold">
+          <h2 className="mb-2 font-sans text-sm font-semibold">
             Event log ({events.length})
           </h2>
           <ol className="max-h-[80dvh] space-y-1 overflow-auto rounded-lg border bg-card p-3">

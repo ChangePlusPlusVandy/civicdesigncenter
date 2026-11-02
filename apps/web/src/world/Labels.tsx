@@ -30,16 +30,16 @@ export function Badge({ building }: { building: Building }) {
   const problem = building.running ? STATUS_LABELS[building.status] : undefined;
   return (
     <div className="flex flex-col items-center gap-0.5 whitespace-nowrap">
-      <span className="flex items-center gap-1 rounded-full bg-white/90 px-1.5 py-0.5 text-xs font-bold text-foreground shadow">
+      <span className="flex items-center gap-1 rounded-full bg-white/90 px-1.5 py-0.5 text-xs font-semibold text-foreground shadow">
         <span aria-hidden="true">{def.icon}</span>
         {building.kind !== "hall" ? (
-          <span className="tracking-tighter text-[var(--orange)]">
+          <span className="tracking-tighter text-warn">
             {"★".repeat(building.level)}
           </span>
         ) : null}
       </span>
       {problem ? (
-        <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
+        <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
           {problem}
         </span>
       ) : null}
@@ -84,8 +84,8 @@ export function MapTag({
     <span
       className={
         kind === "landmark"
-          ? "whitespace-nowrap rounded-full bg-foreground/80 px-2 py-0.5 text-xs font-bold text-background shadow"
-          : "flex items-center gap-1 whitespace-nowrap rounded-full bg-white/85 px-2 py-0.5 text-xs font-bold text-foreground shadow"
+          ? "whitespace-nowrap rounded-full bg-foreground/80 px-2 py-0.5 text-xs font-semibold text-background shadow"
+          : "flex items-center gap-1 whitespace-nowrap rounded-full bg-white/85 px-2 py-0.5 text-xs font-semibold text-foreground shadow"
       }
     >
       {color ? (

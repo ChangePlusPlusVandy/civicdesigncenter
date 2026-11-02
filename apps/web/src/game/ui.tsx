@@ -4,51 +4,59 @@ import { cn } from "@/lib/utils";
 import { bundleIcon, type Toast } from "./format";
 import { useTween } from "./hooks";
 
+// One counter in the city strip: the icon and the number read first, the
+// word under it so nobody has to guess what 🪵 means, and the change per day.
 export function Stat({
   icon,
   label,
   value,
   rate,
   max,
-  className,
+  tone,
 }: {
   icon: string;
   label: string;
   value: number;
   rate?: number;
   max?: number;
-  className?: string;
+  tone?: "warn";
 }) {
   const shown = useTween(value);
+  const moving = rate !== undefined && Math.abs(rate) >= 0.05;
   return (
-    <div
-      className={cn(
-        "flex items-center gap-1.5 rounded-lg bg-secondary px-2 py-1",
-        className,
-      )}
-      title={label}
-    >
-      <span aria-hidden="true" className="text-base leading-none">
-        {icon}
-      </span>
-      <span className="sr-only">{label}</span>
-      <span className="font-bold tabular-nums">
-        {Math.floor(shown)}
-        {max !== undefined ? (
-          <span className="font-medium text-muted-foreground">/{max}</span>
-        ) : null}
-      </span>
-      {rate !== undefined && Math.abs(rate) >= 0.05 ? (
+    <div className="flex min-w-14 flex-col" title={label}>
+      <span className="flex items-center gap-1.5">
+        <span aria-hidden="true" className="text-base leading-none">
+          {icon}
+        </span>
         <span
           className={cn(
-            "text-[11px] font-semibold tabular-nums",
-            rate > 0 ? "text-primary" : "text-destructive",
+            "text-lg font-semibold leading-6 tabular-nums",
+            tone === "warn" && "text-destructive",
           )}
         >
-          {rate > 0 ? "+" : ""}
-          {Math.round(rate * 10) / 10}
+          {Math.floor(shown)}
+          {max !== undefined ? (
+            <span className="text-sm font-medium text-muted-foreground">
+              /{max}
+            </span>
+          ) : null}
         </span>
-      ) : null}
+      </span>
+      <span className="text-xs leading-4 text-muted-foreground">
+        {label}
+        {moving ? (
+          <span
+            className={cn(
+              "ml-1 font-semibold tabular-nums",
+              rate > 0 ? "text-positive" : "text-destructive",
+            )}
+          >
+            {rate > 0 ? "+" : ""}
+            {Math.round(rate * 10) / 10}
+          </span>
+        ) : null}
+      </span>
     </div>
   );
 }
@@ -76,7 +84,7 @@ export function CostChips({
           <span
             key={key}
             className={cn(
-              "rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums",
+              "rounded-lg px-1.5 py-0.5 text-xs font-semibold tabular-nums",
               short ? "bg-destructive/10 text-destructive" : "bg-secondary",
             )}
           >
@@ -112,7 +120,7 @@ export function Meter({
           tone === "warn" || value < 30
             ? "bg-destructive"
             : value < 60
-              ? "bg-[var(--orange)]"
+              ? "bg-warn"
               : "bg-primary",
         )}
         style={{ width: `${Math.min(Math.max(value, 0), 100)}%` }}
@@ -121,10 +129,21 @@ export function Meter({
   );
 }
 
-export function Toasts({ toasts }: { toasts: Toast[] }) {
+// Messages rise from the bottom of the area they belong to, clear of the
+// city strip at the top. `className` places that area.
+export function Toasts({
+  toasts,
+  className = "inset-x-0",
+}: {
+  toasts: Toast[];
+  className?: string;
+}) {
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-20 z-50 flex flex-col items-center gap-2 px-4"
+      className={cn(
+        "pointer-events-none fixed bottom-28 z-50 flex flex-col items-center gap-2 px-4",
+        className,
+      )}
       aria-live="polite"
     >
       {toasts.map((toast) => (
@@ -132,7 +151,7 @@ export function Toasts({ toasts }: { toasts: Toast[] }) {
           key={toast.id}
           role="status"
           className={cn(
-            "animate-toast-in max-w-md rounded-full px-4 py-2 text-center text-sm font-semibold shadow-lg",
+            "animate-toast-in max-w-md rounded-full px-4 py-2 text-center text-sm font-semibold shadow-[0_4px_16px_rgb(22_36_27/0.16)]",
             toast.tone === "good" && "bg-primary text-primary-foreground",
             toast.tone === "bad" && "bg-destructive text-white",
             toast.tone === "info" &&
@@ -158,9 +177,7 @@ export function Section({
   return (
     <section>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </h3>
+        <h3 className="text-sm font-semibold">{title}</h3>
         {action}
       </div>
       {children}
@@ -183,8 +200,8 @@ export function Sparkline({
   const latest = values.at(-1);
   if (latest === undefined || values.length < 2) {
     return (
-      <div className="rounded-lg bg-secondary p-2">
-        <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+      <div className="rounded-xl bg-secondary p-2.5">
+        <p className="text-xs text-muted-foreground">{label}</p>
         <p className="text-xs text-muted-foreground">Collecting data…</p>
       </div>
     );
@@ -201,17 +218,17 @@ export function Sparkline({
   const change = latest - (values[0] ?? latest);
   const better = goodWhen === "up" ? change > 0 : change < 0;
   return (
-    <figure className="rounded-lg bg-secondary p-2">
+    <figure className="rounded-xl bg-secondary p-2.5">
       <figcaption className="flex items-baseline justify-between text-xs">
-        <span className="font-semibold text-muted-foreground">{label}</span>
-        <span className="font-bold tabular-nums">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="text-sm font-semibold tabular-nums">
           {Math.round(latest * 10) / 10}
           {suffix}
           {change ? (
             <span
               className={cn(
-                "ml-1 text-[10px]",
-                better ? "text-primary" : "text-destructive",
+                "ml-1 text-xs",
+                better ? "text-positive" : "text-destructive",
               )}
             >
               {change > 0 ? "▲" : "▼"}

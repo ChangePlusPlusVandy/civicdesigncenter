@@ -78,7 +78,7 @@ function FullScreenMessage({
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-6 text-center">
       <div className="max-w-sm">
-        <h1 className="font-serif text-3xl tracking-tight">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-3 leading-7 text-muted-foreground">{body}</p>
         {action ? <div className="mt-6">{action}</div> : null}
       </div>
@@ -343,7 +343,7 @@ function PlayView({
       : null;
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-[linear-gradient(180deg,#e7f0ea_0%,#f6f5ee_55%,#ede3d1_100%)]">
+    <div className="relative h-dvh w-full overflow-hidden bg-[#e4ede7]">
       <div
         className={cn(
           "absolute inset-y-0 left-0 right-[19rem] lg:right-[22rem]",
@@ -380,26 +380,25 @@ function PlayView({
           <div
             className={cn(
               panel,
-              "pointer-events-auto inline-flex max-w-full flex-col gap-2 p-3",
+              "pointer-events-auto inline-flex max-w-full flex-col gap-2.5 px-4 py-3",
               target === "hud" && "ring-4 ring-primary/60",
             )}
           >
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="flex items-center gap-2">
+              <h1 className="flex items-center gap-2 text-lg font-semibold leading-6 tracking-tight">
                 <span
                   className="size-3 rounded-full"
                   style={{ background: city.color }}
+                  aria-hidden="true"
                 />
-                <span className="font-serif text-xl tracking-tight">
-                  {city.name}
-                </span>
-              </span>
-              <span className="text-xs font-semibold text-muted-foreground">
+                {city.name}
+              </h1>
+              <span className="text-sm text-muted-foreground tabular-nums">
                 Season {state.season} · Day {state.tick}
                 {state.speed > 1 ? ` · ×${state.speed}` : ""}
               </span>
               {state.events.length ? (
-                <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-accent-foreground">
+                <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
                   {state.events
                     .map((e) =>
                       e.kind === "drought"
@@ -417,7 +416,7 @@ function PlayView({
                   setMuted(!muted);
                   setMutedState(!muted);
                 }}
-                className="rounded p-1 text-muted-foreground hover:text-foreground"
+                className="-my-1 ml-auto rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
                 aria-label={muted ? "Turn sound on" : "Turn sound off"}
                 aria-pressed={!muted}
               >
@@ -428,14 +427,14 @@ function PlayView({
                 )}
               </button>
               {game.status === "reconnecting" ? (
-                <span className="flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-bold text-destructive">
+                <span className="flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
                   <WifiOff className="size-3" aria-hidden="true" />{" "}
                   Reconnecting…
                 </span>
               ) : null}
             </div>
             <div
-              className="flex flex-wrap gap-1.5 text-sm"
+              className="flex flex-wrap gap-x-5 gap-y-2"
               aria-label="Your city's stats"
             >
               <Stat
@@ -455,7 +454,7 @@ function PlayView({
               ))}
               <Stat
                 icon="👥"
-                label="People / homes"
+                label="People"
                 value={city.population}
                 max={city.housing}
               />
@@ -465,11 +464,12 @@ function PlayView({
                   setSelected(null);
                   setTab("city");
                 }}
-                className="rounded-lg"
+                className="-m-1 rounded-lg p-1 text-left hover:bg-secondary"
+                aria-label={`Happiness ${city.happiness}. Show why`}
               >
                 <Stat
                   icon={happinessFace(city.happiness)}
-                  label="Happiness (tap for why)"
+                  label="Happy"
                   value={city.happiness}
                 />
               </button>
@@ -477,9 +477,7 @@ function PlayView({
                 icon="🏭"
                 label="Pollution"
                 value={city.pollution}
-                className={
-                  city.pollution >= 8 ? "bg-destructive/10" : undefined
-                }
+                tone={city.pollution >= 8 ? "warn" : undefined}
               />
             </div>
           </div>
@@ -500,7 +498,7 @@ function PlayView({
         </header>
 
         {hint ? (
-          <p className="pointer-events-none absolute inset-x-0 bottom-16 mx-auto w-fit max-w-[90%] rounded-full bg-foreground/85 px-4 py-2 text-center text-sm font-semibold text-background shadow-lg">
+          <p className="pointer-events-none absolute inset-x-0 bottom-16 mx-auto w-fit max-w-[90%] rounded-full bg-foreground px-4 py-2 text-center text-sm font-semibold text-background">
             {hint}
           </p>
         ) : null}
@@ -546,7 +544,7 @@ function PlayView({
         ) : (
           <>
             <nav
-              className="grid grid-cols-4 gap-1 border-b p-2"
+              className="m-3 mb-0 grid grid-cols-4 gap-1 rounded-xl bg-secondary p-1"
               role="tablist"
               aria-label="Panels"
             >
@@ -558,10 +556,10 @@ function PlayView({
                   aria-selected={tab === id}
                   onClick={() => setTab(id)}
                   className={cn(
-                    "relative rounded-md py-2 text-sm font-bold",
+                    "relative rounded-lg py-1.5 text-sm font-semibold transition-colors",
                     tab === id
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-secondary",
+                      ? "bg-card text-foreground shadow-[0_1px_2px_rgb(22_36_27/0.12)]"
+                      : "text-muted-foreground hover:text-foreground",
                     ((target === "city-tab" && id === "city") ||
                       (target?.startsWith("build-") &&
                         id === "build" &&
@@ -575,7 +573,7 @@ function PlayView({
                     (o) => o.to === city.id && o.status === "open",
                   ) ? (
                     <span
-                      className="absolute right-1.5 top-1.5 size-2 rounded-full bg-[var(--orange)]"
+                      className="absolute right-1.5 top-1.5 size-2 rounded-full bg-warn"
                       aria-label="New offers"
                     />
                   ) : null}
@@ -632,7 +630,10 @@ function PlayView({
           onClose={() => setReportSeen(report.season)}
         />
       ) : null}
-      <Toasts toasts={toasts} />
+      <Toasts
+        toasts={toasts}
+        className="left-0 right-[19rem] lg:right-[22rem]"
+      />
       {burst ? <Confetti key={burst} /> : null}
     </div>
   );

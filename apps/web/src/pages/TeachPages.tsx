@@ -33,7 +33,7 @@ import {
 } from "@/game/play/CityPanels";
 import { QuickStart } from "@/game/play/QuickStart";
 import { loadSession, saveSession } from "@/game/session";
-import { COIN, describeEvent, happinessFace, panel } from "@/game/format";
+import { COIN, describeEvent, happinessFace, surface } from "@/game/format";
 import { useToasts } from "@/game/hooks";
 import { Section, Toasts } from "@/game/ui";
 import { useGame, type GameConnection } from "@/game/useGame";
@@ -78,10 +78,7 @@ export function TeachHomePage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-14 sm:px-8 sm:py-20">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-        Teacher console
-      </p>
-      <h1 className="mt-4 font-serif text-5xl tracking-[-0.05em]">
+      <h1 className="text-5xl font-semibold tracking-[-0.04em]">
         Start a class game.
       </h1>
       <p className="mt-4 max-w-xl text-lg leading-8 text-muted-foreground">
@@ -90,7 +87,7 @@ export function TeachHomePage() {
       </p>
       <form
         onSubmit={handleSubmit}
-        className={cn(panel, "mt-10 space-y-5 p-6 shadow-sm")}
+        className={cn(surface, "mt-10 space-y-5 p-6")}
       >
         <fieldset>
           <legend className="text-sm font-semibold">Which map?</legend>
@@ -105,21 +102,21 @@ export function TeachHomePage() {
                   aria-checked={mapId === id}
                   onClick={() => setMapId(id)}
                   className={cn(
-                    "rounded-lg border p-3 text-left",
+                    "rounded-xl border-2 p-3.5 text-left transition-colors",
                     mapId === id
-                      ? "border-primary bg-primary/10 ring-1 ring-primary"
-                      : "hover:bg-secondary",
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:bg-secondary",
                   )}
                 >
-                  <span className="font-bold">{map.name}</span>
-                  <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                  <span className="font-semibold">{map.name}</span>
+                  <span className="mt-1 block text-sm leading-5 text-muted-foreground">
                     {map.blurb}
                   </span>
                   <span className="mt-2 flex flex-wrap gap-1">
                     {map.cities.map((city) => (
                       <span
                         key={city.id}
-                        className="flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[11px] font-semibold"
+                        className="flex items-center gap-1 rounded-md bg-secondary px-1.5 py-0.5 text-xs font-medium"
                       >
                         <span
                           className="size-2 rounded-full"
@@ -136,7 +133,7 @@ export function TeachHomePage() {
         </fieldset>
         <fieldset>
           <legend className="text-sm font-semibold">How many cities?</legend>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Aim for 3 to 6 students per city.
           </p>
           <div className="mt-3 flex gap-2" role="radiogroup">
@@ -148,10 +145,10 @@ export function TeachHomePage() {
                 aria-checked={cities === n}
                 onClick={() => setCities(n)}
                 className={cn(
-                  "h-11 w-14 rounded-lg border text-lg font-bold",
+                  "h-11 w-14 rounded-xl border-2 text-lg font-semibold tabular-nums transition-colors",
                   cities === n
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "hover:bg-secondary",
+                    : "border-border hover:bg-secondary",
                 )}
               >
                 {n}
@@ -161,7 +158,7 @@ export function TeachHomePage() {
         </fieldset>
         {error ? (
           <p
-            className="rounded-md bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive"
+            className="rounded-xl bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive"
             role="alert"
           >
             {error}
@@ -194,7 +191,7 @@ export function TeacherConsolePage() {
     return (
       <main className="flex min-h-dvh items-center justify-center p-6 text-center">
         <div className="max-w-sm">
-          <h1 className="font-serif text-3xl tracking-tight">
+          <h1 className="font-semibold text-3xl tracking-tight">
             This isn't your game on this device
           </h1>
           <p className="mt-3 text-muted-foreground">
@@ -287,11 +284,9 @@ function Console({
     <div className="min-h-dvh bg-background">
       <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b bg-card px-5 py-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            Join code
-          </p>
+          <p className="text-xs text-muted-foreground">Join code</p>
           <p
-            className="font-mono text-4xl font-black tracking-[0.15em]"
+            className="font-mono text-4xl font-semibold tracking-[0.12em]"
             data-testid="join-code"
           >
             {code}
@@ -325,7 +320,7 @@ function Console({
             </Button>
           ) : null}
           <div
-            className="flex rounded-lg border p-0.5"
+            className="flex rounded-xl bg-secondary p-1"
             role="radiogroup"
             aria-label="Speed"
           >
@@ -337,10 +332,10 @@ function Console({
                 aria-checked={state.speed === speed}
                 onClick={() => run({ type: "setSpeed", payload: { speed } })}
                 className={cn(
-                  "rounded-md px-2.5 py-1.5 text-sm font-bold",
+                  "rounded-lg px-2.5 py-1 text-sm font-semibold tabular-nums",
                   state.speed === speed
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-secondary",
+                    ? "bg-card text-foreground shadow-[0_1px_2px_rgb(22_36_27/0.12)]"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 ×{speed}
@@ -381,27 +376,31 @@ function Console({
           {state.meetingResults.length < 2 ? (
             <QuickStart state={state} joinUrl={joinUrl} />
           ) : null}
-          <section className={cn(panel, "overflow-x-auto p-4 shadow-sm")}>
-            <h2 className="mb-3 font-bold">Cities</h2>
+          <section className={cn(surface, "overflow-x-auto p-4")}>
+            <h2 className="mb-3 font-semibold">Cities</h2>
             <table className="w-full min-w-[46rem] text-sm">
               <thead className="text-left text-xs text-muted-foreground">
                 <tr>
-                  <th className="pb-2 font-semibold">City</th>
-                  <th className="pb-2 font-semibold">Students</th>
-                  <th className="pb-2 text-right font-semibold">People</th>
-                  <th className="pb-2 text-right font-semibold">Happy</th>
-                  <th className="pb-2 text-right font-semibold">Pollution</th>
-                  <th className="pb-2 text-right font-semibold">{COIN}</th>
+                  <th className="pb-2 font-medium">City</th>
+                  <th className="pb-2 font-medium">Students</th>
+                  <th className="pb-2 pl-4 text-right font-medium">People</th>
+                  <th className="pb-2 pl-4 text-right font-medium">Happy</th>
+                  <th className="pb-2 pl-4 text-right font-medium">
+                    Pollution
+                  </th>
+                  <th className="pb-2 pl-4 text-right font-medium">{COIN}</th>
                   {GOODS.map((good) => (
                     <th
                       key={good}
-                      className="pb-2 text-right font-semibold"
+                      className="pb-2 pl-4 text-right font-medium"
                       title={GOOD_INFO[good].name}
                     >
                       {GOOD_INFO[good].icon}
                     </th>
                   ))}
-                  <th className="pb-2 text-right font-semibold">Buildings</th>
+                  <th className="pb-2 pl-4 text-right font-medium">
+                    Buildings
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -439,7 +438,7 @@ function Console({
                                   });
                                   if (!ack.ok) push(ack.message, "bad");
                                 }}
-                                className="ml-auto h-6 rounded border bg-background text-xs"
+                                className="ml-auto h-7 rounded-lg border bg-card px-1 text-xs"
                               >
                                 {(state.allCities ?? []).map((c) => (
                                   <option key={c.id} value={c.id}>
@@ -475,30 +474,33 @@ function Console({
                           ))}
                       </ul>
                     </td>
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="py-2 pl-4 text-right tabular-nums">
                       {city.population}/{city.housing}
                     </td>
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="py-2 pl-4 text-right tabular-nums">
                       {happinessFace(city.happiness)}{" "}
                       {Math.round(city.happiness)}
                     </td>
                     <td
                       className={cn(
-                        "py-2 text-right tabular-nums",
-                        city.pollution >= 8 && "font-bold text-destructive",
+                        "py-2 pl-4 text-right tabular-nums",
+                        city.pollution >= 8 && "font-semibold text-destructive",
                       )}
                     >
                       {city.pollution}
                     </td>
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="py-2 pl-4 text-right tabular-nums">
                       {Math.floor(city.coins)}
                     </td>
                     {GOODS.map((good) => (
-                      <td key={good} className="py-2 text-right tabular-nums">
+                      <td
+                        key={good}
+                        className="py-2 pl-4 text-right tabular-nums"
+                      >
                         {Math.floor(city.goods[good])}
                       </td>
                     ))}
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="py-2 pl-4 text-right tabular-nums">
                       {city.buildings.length}
                     </td>
                   </tr>
@@ -508,7 +510,7 @@ function Console({
           </section>
 
           <section
-            className={cn(panel, "h-[26rem] overflow-hidden shadow-sm")}
+            className={cn(surface, "h-[26rem] overflow-hidden")}
             aria-label="Map"
           >
             <WebGLBoundary>
@@ -526,8 +528,8 @@ function Console({
         </div>
 
         <div className="space-y-5">
-          <section className={cn(panel, "space-y-3 p-4 shadow-sm")}>
-            <h2 className="font-bold">Town Meeting</h2>
+          <section className={cn(surface, "space-y-3 p-4")}>
+            <h2 className="font-semibold">Town Meeting</h2>
             {state.meeting ? (
               <>
                 <ul className="space-y-2 text-sm">
@@ -616,8 +618,8 @@ function Console({
             )}
           </section>
 
-          <section className={cn(panel, "space-y-2 p-4 shadow-sm")}>
-            <h2 className="font-bold">Surprise events</h2>
+          <section className={cn(surface, "space-y-2 p-4")}>
+            <h2 className="font-semibold">Surprise events</h2>
             <div className="grid grid-cols-3 gap-2">
               {(Object.keys(EVENTS) as EventKind[]).map((kind) => (
                 <Button
@@ -645,19 +647,19 @@ function Console({
             </div>
           </section>
 
-          <section className={cn(panel, "p-4 shadow-sm")}>
+          <section className={cn(surface, "p-4")}>
             <Section title="Nature everyone shares">
               <NatureHealth game={state} />
             </Section>
           </section>
 
-          <section className={cn(panel, "p-4 shadow-sm")}>
+          <section className={cn(surface, "p-4")}>
             <Section title="Leaderboards">
               <Leaderboards game={state} />
             </Section>
           </section>
 
-          <section className={cn(panel, "p-4 shadow-sm")}>
+          <section className={cn(surface, "p-4")}>
             <Section title="Download class data">
               <ul className="space-y-1.5">
                 {EXPORTS.map(({ file, label, note }) => (
@@ -695,7 +697,7 @@ function Console({
             </Section>
           </section>
 
-          <section className={cn(panel, "p-4 shadow-sm")}>
+          <section className={cn(surface, "p-4")}>
             <Section title={`Reflections (${state.reflections.length})`}>
               {state.reflections.length ? (
                 <ul className="max-h-72 space-y-2 overflow-y-auto text-sm">
@@ -730,7 +732,7 @@ function Console({
             </Section>
           </section>
 
-          <section className={cn(panel, "p-4 shadow-sm")}>
+          <section className={cn(surface, "p-4")}>
             <Section title="What just happened">
               <ul className="space-y-1 text-xs">
                 {recent.map((event) => (

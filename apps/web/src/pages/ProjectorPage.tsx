@@ -43,7 +43,7 @@ export function ProjectorPage() {
   const joinHost = `${window.location.host}/join`;
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-[linear-gradient(180deg,#e7f0ea_0%,#f6f5ee_55%,#ede3d1_100%)]">
+    <div className="relative h-dvh w-full overflow-hidden bg-[#e4ede7]">
       <div className="absolute inset-y-0 left-0 right-[26rem]">
         <WebGLBoundary>
           <Suspense fallback={null}>
@@ -57,7 +57,7 @@ export function ProjectorPage() {
           </Suspense>
         </WebGLBoundary>
         <div className={cn(panel, "absolute left-4 top-4 px-5 py-3")}>
-          <p className="font-serif text-3xl tracking-tight">City Settlers</p>
+          <p className="font-semibold text-3xl tracking-tight">City Settlers</p>
           <p className="text-lg font-semibold text-muted-foreground">
             Season {state.season} · Day {state.tick}
             {state.phase === "paused"
@@ -69,7 +69,7 @@ export function ProjectorPage() {
         </div>
         {state.events.length ? (
           <div className="absolute inset-x-0 bottom-6 flex justify-center">
-            <p className={cn(panel, "px-6 py-3 text-2xl font-bold")}>
+            <p className={cn(panel, "px-6 py-3 text-2xl font-semibold")}>
               {state.events
                 .map((e) =>
                   e.kind === "drought"
@@ -86,12 +86,10 @@ export function ProjectorPage() {
 
       <aside className="absolute inset-y-0 right-0 flex w-[26rem] flex-col gap-4 overflow-y-auto border-l bg-card p-5">
         {state.phase === "lobby" || state.phase === "running" ? (
-          <section className="rounded-xl bg-primary p-4 text-primary-foreground">
-            <p className="text-sm font-semibold opacity-80">
-              Join at {joinHost}
-            </p>
+          <section className="rounded-2xl bg-primary p-4 text-primary-foreground">
+            <p className="text-base font-medium">Join at {joinHost}</p>
             <p
-              className="font-mono text-5xl font-black tracking-[0.15em]"
+              className="font-mono text-5xl font-semibold tracking-[0.12em]"
               data-testid="projector-code"
             >
               {code}
@@ -100,12 +98,12 @@ export function ProjectorPage() {
         ) : null}
 
         {state.meeting ? (
-          <section className="rounded-xl border-2 border-primary p-4">
-            <h2 className="text-2xl font-bold">🏛️ Town Meeting</h2>
+          <section className="rounded-2xl p-4 ring-2 ring-primary">
+            <h2 className="text-2xl font-semibold">🏛️ Town Meeting</h2>
             <ul className="mt-3 space-y-2">
               {state.meeting.policyIds.map((id) => (
                 <li key={id}>
-                  <p className="text-lg font-bold">{POLICIES[id].name}</p>
+                  <p className="text-lg font-semibold">{POLICIES[id].name}</p>
                   <p className="text-sm text-muted-foreground">
                     {POLICIES[id].summary}
                   </p>
@@ -118,8 +116,8 @@ export function ProjectorPage() {
             </p>
           </section>
         ) : lastResult ? (
-          <section className="rounded-xl border p-4">
-            <h2 className="font-bold">Season {lastResult.season} vote</h2>
+          <section className="rounded-2xl border p-4">
+            <h2 className="font-semibold">Season {lastResult.season} vote</h2>
             <ul className="mt-2 space-y-1 text-sm">
               {Object.entries(lastResult.tally).map(([id, tally]) => (
                 <li key={id} className="flex justify-between">
@@ -137,23 +135,21 @@ export function ProjectorPage() {
         ) : null}
 
         <section>
-          <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Cities
-          </h2>
-          <ul className="space-y-1.5">
+          <h2 className="mb-2 text-lg font-semibold">Cities</h2>
+          <ul className="divide-y text-lg">
             {state.cities.map((city) => (
-              <li
-                key={city.id}
-                className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-2"
-              >
+              <li key={city.id} className="flex items-center gap-2.5 py-2">
                 <span
-                  className="size-3 rounded-full"
+                  className="size-3.5 rounded-full"
                   style={{ background: city.color }}
+                  aria-hidden="true"
                 />
-                <span className="font-bold">{city.name}</span>
-                <span className="ml-auto text-sm tabular-nums">
-                  👥 {city.population} · {happinessFace(city.happiness)}{" "}
-                  {city.happiness}
+                <span className="font-semibold">{city.name}</span>
+                <span className="ml-auto flex gap-4 tabular-nums">
+                  <span title="People">👥 {city.population}</span>
+                  <span title="Happiness">
+                    {happinessFace(city.happiness)} {city.happiness}
+                  </span>
                 </span>
               </li>
             ))}
@@ -161,9 +157,7 @@ export function ProjectorPage() {
         </section>
 
         <section>
-          <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Nature we share
-          </h2>
+          <h2 className="mb-2 text-lg font-semibold">Nature we share</h2>
           <NatureHealth game={state} />
           <div className="mt-3">
             <Sparkline
@@ -175,9 +169,7 @@ export function ProjectorPage() {
         </section>
 
         <section>
-          <h2 className="mb-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-            Leaderboards
-          </h2>
+          <h2 className="mb-2 text-lg font-semibold">Leaderboards</h2>
           <Leaderboards game={state} />
         </section>
       </aside>

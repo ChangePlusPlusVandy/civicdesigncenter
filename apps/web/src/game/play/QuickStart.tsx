@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, Circle, X } from "lucide-react";
 import type { Projection } from "@cs/idle";
 import { cn } from "@/lib/utils";
-import { panel } from "../format";
+import { surface } from "../format";
 
 // The teacher's run-of-show. Steps tick themselves off as the class plays.
 export function QuickStart({
@@ -43,12 +43,9 @@ export function QuickStart({
   ];
   if (hidden) return null;
   return (
-    <section
-      className={cn(panel, "p-4 shadow-sm")}
-      aria-label="How to run a game"
-    >
+    <section className={cn(surface, "p-4")} aria-label="How to run a game">
       <div className="flex items-start justify-between">
-        <h2 className="font-bold">How to run a game</h2>
+        <h2 className="font-semibold">How to run a game</h2>
         <button
           type="button"
           onClick={() => setHidden(true)}

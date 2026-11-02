@@ -160,7 +160,7 @@ export function Leaderboards({
     <div className="grid grid-cols-2 gap-2">
       {game.leaderboards.map((board) => (
         <div key={board.id} className="rounded-lg border p-2">
-          <h4 className="text-xs font-bold text-muted-foreground">
+          <h4 className="text-xs font-semibold text-muted-foreground">
             {board.title}
           </h4>
           <ol className="mt-1 space-y-0.5 text-sm">
@@ -171,7 +171,7 @@ export function Leaderboards({
                   key={row.cityId}
                   className={cn(
                     "flex items-center gap-1.5",
-                    row.cityId === highlight && "font-bold",
+                    row.cityId === highlight && "font-semibold",
                   )}
                 >
                   <span className="w-3 text-xs text-muted-foreground">
@@ -242,7 +242,7 @@ export function CityPanel({
               <span>{factor.label}</span>
               <span
                 className={cn(
-                  "font-bold tabular-nums",
+                  "font-semibold tabular-nums",
                   factor.value < 0
                     ? "text-destructive"
                     : factor.label === "Base"
@@ -255,7 +255,7 @@ export function CityPanel({
               </span>
             </li>
           ))}
-          <li className="flex justify-between border-t pt-1 font-bold">
+          <li className="flex justify-between border-t pt-1 font-semibold">
             <span>Happiness is heading to</span>
             <span className="tabular-nums">
               {Math.min(Math.max(total, 0), 100)}
@@ -346,15 +346,15 @@ export function MeetingModal({
         className={cn(panel, "max-h-[90dvh] w-full max-w-xl overflow-auto p-6")}
         aria-labelledby="meeting-title"
       >
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-          Season {game.season} · Town Meeting
-        </p>
         <h2
           id="meeting-title"
-          className="mt-2 font-serif text-3xl tracking-tight"
+          className="text-2xl font-semibold tracking-tight"
         >
-          🏛️ Time to vote
+          🏛️ Town Meeting: time to vote
         </h2>
+        <p className="mt-1 text-sm font-medium text-primary">
+          End of season {game.season}
+        </p>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           Talk it over with your team. Each city gets one vote per rule. A rule
           passes if more cities vote yes than no, and it changes the game for
@@ -365,7 +365,7 @@ export function MeetingModal({
             const vote = meeting.myVotes?.[id];
             return (
               <li key={id} className="rounded-lg border p-3">
-                <h3 className="font-bold">{POLICIES[id].name}</h3>
+                <h3 className="font-semibold">{POLICIES[id].name}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {POLICIES[id].summary}
                 </p>
@@ -432,13 +432,13 @@ function Change({
   return (
     <div className="rounded-lg bg-secondary p-3">
       <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-bold tabular-nums">
+      <p className="mt-1 text-lg font-semibold tabular-nums">
         {before} → {after}
       </p>
       {diff ? (
         <p
           className={cn(
-            "text-xs font-bold",
+            "text-xs font-semibold",
             better ? "text-primary" : "text-destructive",
           )}
         >
@@ -485,7 +485,7 @@ function Reflection({
 
   return (
     <section className="mt-5 rounded-lg border p-3">
-      <h3 className="text-sm font-bold">💭 Think about it</h3>
+      <h3 className="text-sm font-semibold">💭 Think about it</h3>
       <p className="mt-1 text-sm">{prompt}</p>
       {sent ? null : (
         <form onSubmit={submit} className="mt-2 space-y-2">
@@ -545,14 +545,8 @@ export function SeasonReportModal({
         className={cn(panel, "max-h-[90dvh] w-full max-w-xl overflow-auto p-6")}
         aria-labelledby="report-title"
       >
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
-          Season {report.season} report
-        </p>
-        <h2
-          id="report-title"
-          className="mt-2 font-serif text-3xl tracking-tight"
-        >
-          How did your city do?
+        <h2 id="report-title" className="text-2xl font-semibold tracking-tight">
+          How did your city do in season {report.season}?
         </h2>
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Change
@@ -577,7 +571,7 @@ export function SeasonReportModal({
             good="down"
           />
         </div>
-        <h3 className="mt-5 text-sm font-bold">Nature everyone shares</h3>
+        <h3 className="mt-5 text-sm font-semibold">Nature everyone shares</h3>
         <div className="mt-2 grid grid-cols-3 gap-2">
           {(Object.keys(report.commons) as CommonsId[]).map((id) => (
             <Change
@@ -629,7 +623,7 @@ export function PhaseOverlay({
             <p className="text-4xl" aria-hidden="true">
               🏗️
             </p>
-            <h2 className="mt-2 font-serif text-2xl tracking-tight">
+            <h2 className="mt-2 font-semibold text-2xl tracking-tight">
               You're on {city.name}!
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -642,7 +636,9 @@ export function PhaseOverlay({
             <p className="text-4xl" aria-hidden="true">
               👀
             </p>
-            <h2 className="mt-2 font-serif text-2xl tracking-tight">Paused</h2>
+            <h2 className="mt-2 font-semibold text-2xl tracking-tight">
+              Paused
+            </h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Eyes on your teacher.
             </p>
@@ -652,7 +648,7 @@ export function PhaseOverlay({
             <p className="text-4xl" aria-hidden="true">
               🎉
             </p>
-            <h2 className="mt-2 font-serif text-2xl tracking-tight">
+            <h2 className="mt-2 font-semibold text-2xl tracking-tight">
               Game over!
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">

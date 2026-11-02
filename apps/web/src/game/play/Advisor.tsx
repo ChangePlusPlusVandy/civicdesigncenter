@@ -26,30 +26,25 @@ export function AdvisorCard({
     <section
       className={cn(
         panel,
-        "pointer-events-auto w-[22rem] max-w-full p-3",
+        "pointer-events-auto w-[22rem] max-w-full px-4 py-3",
         warn && "border-destructive/40",
       )}
       aria-label="Advisor"
       aria-live="polite"
     >
       <div className="flex items-start gap-2.5">
-        <span
-          className={cn(
-            "grid size-8 shrink-0 place-items-center rounded-full",
-            warn
-              ? "bg-destructive/10 text-destructive"
-              : "bg-primary/10 text-primary",
-          )}
-          aria-hidden="true"
-        >
-          {warn ? (
-            <TriangleAlert className="size-4" />
-          ) : (
-            <Lightbulb className="size-4" />
-          )}
-        </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          <p
+            className={cn(
+              "flex items-center gap-1.5 text-xs font-semibold",
+              warn ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {warn ? (
+              <TriangleAlert className="size-3.5" aria-hidden="true" />
+            ) : (
+              <Lightbulb className="size-3.5" aria-hidden="true" />
+            )}
             {warn ? "Needs attention" : "Next idea"}
           </p>
           <p className="mt-0.5 text-sm font-semibold leading-5">
@@ -81,7 +76,7 @@ export function AdvisorCard({
         {!warn ? (
           <button
             type="button"
-            className="rounded p-1 text-muted-foreground hover:text-foreground"
+            className="-mr-1 rounded-lg p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Hide this idea"
             onClick={() =>
               setSkipped((current) => new Set(current).add(top.id))

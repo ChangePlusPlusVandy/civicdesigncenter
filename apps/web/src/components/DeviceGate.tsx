@@ -39,7 +39,7 @@ export function DeviceGate({ children }: { children: ReactNode }) {
           <Tablet className="size-10" />
           <Laptop className="size-10" />
         </div>
-        <h1 className="mt-6 font-serif text-3xl tracking-tight">
+        <h1 className="mt-6 font-semibold text-3xl tracking-tight">
           City Settlers needs a bigger screen
         </h1>
         <p className="mt-3 leading-7 text-muted-foreground">
