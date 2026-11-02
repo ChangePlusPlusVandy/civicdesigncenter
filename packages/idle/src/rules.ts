@@ -50,6 +50,7 @@ import type {
   Intent,
   MeetingResult,
   Phase,
+  PlayerIntent,
   ReduceResult,
   RuleError,
   SeasonSnapshot,
@@ -161,9 +162,20 @@ function isWhole(amount: unknown, max = Infinity): amount is number {
   );
 }
 
-const PLAYER_PHASES: Record<string, Phase[]> = {
-  vote: ["meeting"],
-  default: ["running"],
+// Players may vote only during a meeting; everything else needs the game
+// to be running.
+const PLAYER_INTENTS: Record<PlayerIntent["type"], Phase> = {
+  build: "running",
+  upgrade: "running",
+  demolish: "running",
+  toggle: "running",
+  marketBuy: "running",
+  marketSell: "running",
+  proposeTrade: "running",
+  acceptTrade: "running",
+  declineTrade: "running",
+  cancelTrade: "running",
+  vote: "meeting",
 };
 
 export function reduce(
@@ -184,8 +196,9 @@ export function reduce(
 
   const city = state.cities[actor.cityId];
   if (!city) return fail("NOT_FOUND", "Your city isn't in this game.");
-  const phases = PLAYER_PHASES[intent.type] ?? PLAYER_PHASES.default ?? [];
-  if (!phases.includes(state.phase)) {
+  const needed = PLAYER_INTENTS[intent.type as PlayerIntent["type"]];
+  if (!needed) return fail("NOT_ALLOWED", `Players can't ${intent.type}.`);
+  if (state.phase !== needed) {
     const message =
       state.phase === "meeting"
         ? "The Town Meeting is on. Vote first!"
@@ -233,9 +246,8 @@ export function reduce(
       return closeTrade(state, city, intent.payload.offerId, intent.type);
     case "vote":
       return vote(state, city, intent.payload.policyId, intent.payload.yes);
-    default:
-      return fail("NOT_ALLOWED", `Players can't ${intent.type}.`);
   }
+  return fail("NOT_ALLOWED", `Players can't ${intent.type}.`);
 }
 
 function build(

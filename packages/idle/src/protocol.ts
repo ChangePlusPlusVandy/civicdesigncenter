@@ -34,14 +34,25 @@ export const SERVER_EVENTS = {
 // Client -> server events.
 export const CLIENT_EVENTS = {
   action: "action",
+  admin: "admin",
 } as const;
 
+// Teacher-only roster changes. They aren't game rules, so the server
+// handles them outside the engine.
+export type AdminMessage =
+  | { type: "movePlayer"; playerId: string; cityId: CityId }
+  | { type: "removePlayer"; playerId: string };
+
+// One row of the research log. Rejected attempts are logged too, with no
+// change to the state (docs/ARCHITECTURE.md).
 export interface LoggedEvent extends GameEvent {
   seq: number;
   tick: number;
   at: number;
   actor: "player" | "teacher" | "system";
   participantId?: string;
+  outcome: "accepted" | "rejected";
+  errorCode?: string;
 }
 
 // REST, under /api/sandbox.

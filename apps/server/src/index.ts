@@ -1,5 +1,7 @@
+import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createApp } from "./app.ts";
+import { Sandbox } from "./sandbox/index.ts";
 
 // Load the repo-root .env if present (local dev). Deployed environments set real env vars.
 try {
@@ -16,8 +18,11 @@ const webDist =
   process.env.WEB_DIST ??
   fileURLToPath(new URL("../../web/dist", import.meta.url));
 
-const app = createApp({ webDist: isProduction ? webDist : undefined });
+const sandbox = new Sandbox();
+const app = createApp({ webDist: isProduction ? webDist : undefined, sandbox });
+const server = createServer(app);
+sandbox.attach(server);
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`server listening on http://localhost:${port}`);
 });
