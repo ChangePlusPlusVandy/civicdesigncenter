@@ -45,6 +45,9 @@ export function HomePage() {
           <Button asChild variant="outline" size="lg">
             <Link to="/teach">Teacher console</Link>
           </Button>
+          <Button asChild variant="ghost" size="lg">
+            <Link to="/prototype/world">Explore the 3D world</Link>
+          </Button>
         </div>
       </section>
 
