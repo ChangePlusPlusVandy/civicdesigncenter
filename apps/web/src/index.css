@@ -97,12 +97,28 @@ html {
   animation: float-up 1.4s ease-out forwards;
 }
 
+@keyframes confetti-fall {
+  from {
+    opacity: 1;
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(var(--drift), 90vh, 0) rotate(var(--spin));
+  }
+}
+
+@utility animate-confetti {
+  animation: confetti-fall var(--duration, 1.8s) ease-in forwards;
+}
+
 @utility animate-toast-in {
   animation: toast-in 0.25s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-float-up,
+  .animate-confetti,
   .animate-toast-in {
     animation: none;
   }

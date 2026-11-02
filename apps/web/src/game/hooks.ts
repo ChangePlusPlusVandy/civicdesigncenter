@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Toast } from "./format";
+import { play } from "./sound";
 
 // Counts smoothly toward `value` so ticking numbers feel alive.
 export function useTween(value: number, duration = 600): number {
@@ -34,4 +35,14 @@ export function useToasts() {
     );
   }, []);
   return { toasts, push };
+}
+
+// Confetti and a fanfare. `burst` changes each time, to re-key <Confetti>.
+export function useCelebration() {
+  const [burst, setBurst] = useState(0);
+  const celebrate = useCallback(() => {
+    play("goal");
+    setBurst((count) => count + 1);
+  }, []);
+  return { burst, celebrate };
 }

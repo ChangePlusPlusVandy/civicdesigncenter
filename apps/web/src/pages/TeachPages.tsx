@@ -24,6 +24,7 @@ import {
   Leaderboards,
   NatureHealth,
 } from "@/game/play/CityPanels";
+import { QuickStart } from "@/game/play/QuickStart";
 import { loadSession, saveSession } from "@/game/session";
 import { COIN, describeEvent, happinessFace, panel } from "@/game/format";
 import { useToasts } from "@/game/hooks";
@@ -338,6 +339,9 @@ function Console({
 
       <div className="grid gap-5 p-5 xl:grid-cols-[1fr_26rem]">
         <div className="space-y-5">
+          {state.meetingResults.length < 2 ? (
+            <QuickStart state={state} joinUrl={joinUrl} />
+          ) : null}
           <section className={cn(panel, "overflow-x-auto p-4 shadow-sm")}>
             <h2 className="mb-3 font-bold">Cities</h2>
             <table className="w-full min-w-[46rem] text-sm">

@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { RotateCcw, RotateCw, WifiOff } from "lucide-react";
+import { RotateCcw, RotateCw, Volume2, VolumeX, WifiOff } from "lucide-react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import {
   BUILDINGS,
@@ -39,10 +39,14 @@ import {
 import { MarketPanel, TradePanel } from "@/game/play/EconomyPanels";
 import { clearSession, loadSession, type Session } from "@/game/session";
 import { COIN, describeEvent, happinessFace, panel } from "@/game/format";
-import { useToasts } from "@/game/hooks";
+import { useCelebration, useToasts } from "@/game/hooks";
 import { Stat, Toasts } from "@/game/ui";
 import { advise, type Tip } from "@/game/advisor";
 import { AdvisorCard } from "@/game/play/Advisor";
+import { Confetti } from "@/game/play/Confetti";
+import { TutorialCard } from "@/game/play/TutorialCard";
+import { isMuted, play, setMuted, type Sound } from "@/game/sound";
+import { useTutorial } from "@/game/tutorial";
 import { useGame, type GameConnection } from "@/game/useGame";
 import { cn } from "@/lib/utils";
 import type { PlacementCell } from "@/world/Markers";
@@ -144,6 +148,26 @@ function PlayerGame({
   return <PlayView game={game} state={game.state} city={game.state.myCity} />;
 }
 
+const ACTION_SOUNDS: Partial<Record<ClientIntent["type"], Sound>> = {
+  build: "build",
+  upgrade: "upgrade",
+  marketBuy: "coin",
+  marketSell: "coin",
+  proposeTrade: "trade",
+  acceptTrade: "trade",
+  vote: "notify",
+  reflect: "notify",
+};
+
+// Game-wide moments everyone should hear.
+const EVENT_SOUNDS: Record<string, Sound> = {
+  "game.started": "bell",
+  "meeting.started": "bell",
+  "policy.passed": "notify",
+  "commons.collapsed": "warning",
+  "event.triggered": "notify",
+};
+
 function useRun(
   game: GameConnection,
   push: ReturnType<typeof useToasts>["push"],
@@ -152,9 +176,12 @@ function useRun(
     async (intent: ClientIntent, success?: string) => {
       const ack = await game.act(intent);
       if (!ack.ok) {
+        play("error");
         push(ack.message, "bad");
         return false;
       }
+      const sound = ACTION_SOUNDS[intent.type];
+      if (sound) play(sound);
       if (success) push(success, "good");
       return true;
     },
@@ -173,6 +200,8 @@ function PlayView({
 }) {
   const map = getMap(state.mapId);
   const { toasts, push } = useToasts();
+  const { burst, celebrate } = useCelebration();
+  const [muted, setMutedState] = useState(isMuted);
   const run = useRun(game, push);
   const [tab, setTab] = useState<Tab>("build");
   const [placing, setPlacing] = useState<BuildableKind | null>(null);
@@ -192,30 +221,43 @@ function PlayView({
         if (event.seq <= lastSeq.current) continue;
         const message = describeEvent(event, map);
         if (message) push(message.text, message.tone);
+        if (event.type === "goal.achieved") celebrate();
+        else if (EVENT_SOUNDS[event.type])
+          play(EVENT_SOUNDS[event.type] as Sound);
       }
     }
     lastSeq.current = newest;
-  }, [game.events, push, map]);
+  }, [game.events, push, map, celebrate]);
 
-  // Other cities' offers to us don't come as events; spot them in the state.
-  const knownOffers = useRef<Set<string> | null>(null);
+  // Other cities' answers to our offers, and their offers to us, show up in
+  // the state rather than as events; spot what changed.
+  const knownOffers = useRef<Map<string, string> | null>(null);
   useEffect(() => {
-    const incoming = state.offers.filter(
-      (o) => o.to === city.id && o.status === "open",
-    );
-    if (knownOffers.current) {
-      for (const offer of incoming) {
-        if (!knownOffers.current.has(offer.id)) {
-          const from = state.cities.find((c) => c.id === offer.from)?.name;
+    const known = knownOffers.current;
+    if (known) {
+      for (const offer of state.offers) {
+        const before = known.get(offer.id);
+        const other = state.cities.find(
+          (c) => c.id === (offer.from === city.id ? offer.to : offer.from),
+        )?.name;
+        if (!before && offer.to === city.id && offer.status === "open") {
+          play("notify");
           push(
-            `📦 ${from} sent you a trade offer. Check the Trade tab.`,
+            `📦 ${other} sent you a trade offer. Check the Trade tab.`,
             "info",
           );
+        } else if (before === "open" && offer.from === city.id) {
+          if (offer.status === "accepted") {
+            celebrate();
+            push(`🤝 ${other} accepted your trade!`, "good");
+          } else if (offer.status === "declined") {
+            push(`${other} said no to your trade.`, "info");
+          }
         }
       }
     }
-    knownOffers.current = new Set(state.offers.map((o) => o.id));
-  }, [state.offers, state.cities, city.id, push]);
+    knownOffers.current = new Map(state.offers.map((o) => [o.id, o.status]));
+  }, [state.offers, state.cities, city.id, push, celebrate]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -282,6 +324,8 @@ function PlayView({
     : null;
 
   const tips = useMemo(() => advise(state, city), [state, city]);
+  const tutorial = useTutorial({ state, city, tab });
+  const target = tutorial.step?.target;
 
   function handleTip(tip: Tip) {
     setSelected(null);
@@ -337,6 +381,7 @@ function PlayView({
             className={cn(
               panel,
               "pointer-events-auto inline-flex max-w-full flex-col gap-2 p-3",
+              target === "hud" && "ring-4 ring-primary/60",
             )}
           >
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -366,6 +411,22 @@ function PlayView({
                     .join(" · ")}
                 </span>
               ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setMuted(!muted);
+                  setMutedState(!muted);
+                }}
+                className="rounded p-1 text-muted-foreground hover:text-foreground"
+                aria-label={muted ? "Turn sound on" : "Turn sound off"}
+                aria-pressed={!muted}
+              >
+                {muted ? (
+                  <VolumeX className="size-4" aria-hidden="true" />
+                ) : (
+                  <Volume2 className="size-4" aria-hidden="true" />
+                )}
+              </button>
               {game.status === "reconnecting" ? (
                 <span className="flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-bold text-destructive">
                   <WifiOff className="size-3" aria-hidden="true" />{" "}
@@ -422,7 +483,18 @@ function PlayView({
               />
             </div>
           </div>
-          {state.phase === "running" && !placing ? (
+          {tutorial.step ? (
+            <TutorialCard
+              step={tutorial.step}
+              number={tutorial.number}
+              total={tutorial.total}
+              state={state}
+              city={city}
+              tab={tab}
+              onNext={tutorial.next}
+              onSkip={tutorial.skip}
+            />
+          ) : state.phase === "running" && !placing ? (
             <AdvisorCard tips={tips} onAction={handleTip} />
           ) : null}
         </header>
@@ -490,6 +562,11 @@ function PlayView({
                     tab === id
                       ? "bg-primary text-primary-foreground"
                       : "hover:bg-secondary",
+                    ((target === "city-tab" && id === "city") ||
+                      (target?.startsWith("build-") &&
+                        id === "build" &&
+                        tab !== "build")) &&
+                      "animate-pulse ring-2 ring-primary",
                   )}
                 >
                   {label}
@@ -519,6 +596,13 @@ function PlayView({
                   <BuildPanel
                     city={city}
                     placing={placing}
+                    highlight={
+                      target === "build-farm"
+                        ? "farm"
+                        : target === "build-house"
+                          ? "house"
+                          : undefined
+                    }
                     onPick={(kind) => {
                       setPlacing(kind);
                       setSelected(null);
@@ -549,6 +633,7 @@ function PlayView({
         />
       ) : null}
       <Toasts toasts={toasts} />
+      {burst ? <Confetti key={burst} /> : null}
     </div>
   );
 }

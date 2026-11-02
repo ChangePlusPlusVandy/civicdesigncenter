@@ -113,10 +113,13 @@ export function SpotPicker({
 export function BuildPanel({
   city,
   placing,
+  highlight,
   onPick,
 }: {
   city: PrivateCity;
   placing: BuildableKind | null;
+  // The tutorial points at a building to try.
+  highlight?: BuildableKind;
   onPick: (kind: BuildableKind | null) => void;
 }) {
   return (
@@ -135,6 +138,9 @@ export function BuildPanel({
                 "flex w-full items-start gap-3 rounded-lg border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 active ? "border-primary bg-primary/10" : "hover:bg-secondary",
                 !affordable && !active && "opacity-60",
+                highlight === kind &&
+                  !active &&
+                  "animate-pulse ring-2 ring-primary",
               )}
             >
               <span className="text-2xl leading-none" aria-hidden="true">

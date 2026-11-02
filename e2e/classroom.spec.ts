@@ -19,7 +19,7 @@ test("a teacher and two students play one game together", async ({
 }) => {
   const teacher = await (await browser.newContext()).newPage();
   await teacher.goto("/teach");
-  await teacher.getByRole("radio", { name: "2" }).click();
+  await teacher.getByRole("radio", { name: "2", exact: true }).click();
   await teacher.getByRole("button", { name: "Create game" }).click();
   await expect(teacher).toHaveURL(/\/teach\/[A-Z0-9]{5}$/);
   const code =
@@ -32,18 +32,26 @@ test("a teacher and two students play one game together", async ({
   await teacher.getByRole("button", { name: "Start game" }).click();
   await expect(ana.getByText(/Day [1-9]/)).toBeVisible({ timeout: 15_000 });
 
-  // The advisor suggests a first step.
-  await expect(ana.getByRole("region", { name: "Advisor" })).toContainText(
-    /Farm/,
-  );
-
-  // Ana builds a farm from the spot picker.
+  // Ana follows the tutorial: two intro steps, then she builds a farm from
+  // the spot picker and the tutorial moves on by itself.
+  const tutorial = ana.getByRole("region", { name: "Tutorial" });
+  await expect(tutorial).toContainText("Welcome to");
+  await tutorial.getByRole("button", { name: "Next" }).click();
+  await tutorial.getByRole("button", { name: "Next" }).click();
+  await expect(tutorial).toContainText("Grow some food");
   await ana.getByRole("button", { name: /^Farm/ }).click();
   await ana
     .getByRole("button", { name: /^Build here/ })
     .first()
     .click();
   await expect(ana.getByText(/Farm built/)).toBeVisible();
+  await expect(tutorial).toContainText("Make room for more people");
+
+  // Ben skips the tutorial and gets the advisor instead.
+  await ben.getByRole("button", { name: "Skip tutorial" }).click();
+  await expect(ben.getByRole("region", { name: "Advisor" })).toContainText(
+    /Farm/,
+  );
 
   // Ben's own connection receives Ana's farm.
   const benDebug = await ben.context().newPage();
