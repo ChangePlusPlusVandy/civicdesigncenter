@@ -1,9 +1,11 @@
 import { lazy, Suspense, useState, type FormEvent } from "react";
 import { ArrowRight, LoaderCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { normalizeRoomCode } from "@cs/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { mockJoinGame } from "@/lib/mock-join";
+import { joinGame } from "@/game/api";
+import { saveSession } from "@/game/session";
 
 // three.js is large; load it after the form so joining is never blocked on it.
 const WorldBackdrop = lazy(() =>
@@ -14,7 +16,9 @@ const WorldBackdrop = lazy(() =>
 
 export function JoinPage() {
   const navigate = useNavigate();
-  const [roomCode, setRoomCode] = useState("");
+  // Teachers can share /join?code=ABCDE so students only type a name.
+  const [params] = useSearchParams();
+  const [roomCode, setRoomCode] = useState(params.get("code") ?? "");
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [isJoining, setIsJoining] = useState(false);
@@ -22,15 +26,23 @@ export function JoinPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    const code = normalizeRoomCode(roomCode);
+    if (!code) {
+      setError("Room codes are 4–8 letters or numbers.");
+      return;
+    }
     setIsJoining(true);
 
     try {
-      const player = await mockJoinGame({
-        roomCode: roomCode.trim().toUpperCase(),
-        username,
+      const player = await joinGame(code, username);
+      saveSession({
+        role: "player",
+        code: player.code,
+        token: player.token,
+        name: player.name,
+        cityId: player.cityId,
       });
-      const playerParams = new URLSearchParams({ username: player.username });
-      navigate(`/play/${player.roomCode}?${playerParams.toString()}`);
+      navigate(`/play/${player.code}`);
     } catch (joinError) {
       setError(
         joinError instanceof Error

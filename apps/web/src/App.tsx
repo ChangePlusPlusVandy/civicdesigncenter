@@ -1,6 +1,8 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
+import { DeviceGate } from "@/components/DeviceGate";
+import { DebugPage } from "@/pages/DebugPage";
 import { HomePage } from "@/pages/HomePage";
 import { JoinPage } from "@/pages/JoinPage";
 import {
@@ -21,28 +23,31 @@ const WorldPrototypePage = lazy(() =>
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="prototype/world"
-          element={
-            <Suspense fallback={null}>
-              <WorldPrototypePage />
-            </Suspense>
-          }
-        />
-        <Route element={<AppLayout />}>
-          <Route index element={<HomePage />} />
-          <Route path="join" element={<JoinPage />} />
-          <Route path="play/:code" element={<PlayerPage />} />
-          <Route path="city/:code" element={<CityPage />} />
-          <Route path="projector/:code" element={<ProjectorPage />} />
-          <Route path="teach" element={<TeachPage />} />
-          <Route path="teach/:gameId" element={<TeachGamePage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <DeviceGate>
+      <BrowserRouter>
+        <Routes>
+          <Route path="debug/:code" element={<DebugPage />} />
+          <Route
+            path="prototype/world"
+            element={
+              <Suspense fallback={null}>
+                <WorldPrototypePage />
+              </Suspense>
+            }
+          />
+          <Route element={<AppLayout />}>
+            <Route index element={<HomePage />} />
+            <Route path="join" element={<JoinPage />} />
+            <Route path="play/:code" element={<PlayerPage />} />
+            <Route path="city/:code" element={<CityPage />} />
+            <Route path="projector/:code" element={<ProjectorPage />} />
+            <Route path="teach" element={<TeachPage />} />
+            <Route path="teach/:gameId" element={<TeachGamePage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </DeviceGate>
   );
 }
 
