@@ -4,6 +4,7 @@ import { POLICIES } from "@cs/idle";
 import { normalizeRoomCode } from "@cs/shared";
 import { Leaderboards, NatureHealth } from "@/game/play/CityPanels";
 import { happinessFace, panel } from "@/game/format";
+import { Sparkline } from "@/game/ui";
 import { useGame } from "@/game/useGame";
 import { cn } from "@/lib/utils";
 import { WebGLBoundary } from "@/world/WebGLBoundary";
@@ -163,6 +164,13 @@ export function ProjectorPage() {
             Nature we share
           </h2>
           <NatureHealth game={state} />
+          <div className="mt-3">
+            <Sparkline
+              label="Region health over time"
+              values={state.regionHistory.map((h) => h.health)}
+              suffix="%"
+            />
+          </div>
         </section>
 
         <section>

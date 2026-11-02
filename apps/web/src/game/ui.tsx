@@ -167,3 +167,73 @@ export function Section({
     </section>
   );
 }
+
+// A tiny trend line with the latest value, for the City tab and projector.
+export function Sparkline({
+  label,
+  values,
+  suffix = "",
+  goodWhen = "up",
+}: {
+  label: string;
+  values: number[];
+  suffix?: string;
+  goodWhen?: "up" | "down";
+}) {
+  const latest = values.at(-1);
+  if (latest === undefined || values.length < 2) {
+    return (
+      <div className="rounded-lg bg-secondary p-2">
+        <p className="text-xs font-semibold text-muted-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground">Collecting data…</p>
+      </div>
+    );
+  }
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const points = values
+    .map(
+      (value, i) =>
+        `${(i / (values.length - 1)) * 100},${28 - ((value - min) / span) * 24}`,
+    )
+    .join(" ");
+  const change = latest - (values[0] ?? latest);
+  const better = goodWhen === "up" ? change > 0 : change < 0;
+  return (
+    <figure className="rounded-lg bg-secondary p-2">
+      <figcaption className="flex items-baseline justify-between text-xs">
+        <span className="font-semibold text-muted-foreground">{label}</span>
+        <span className="font-bold tabular-nums">
+          {Math.round(latest * 10) / 10}
+          {suffix}
+          {change ? (
+            <span
+              className={cn(
+                "ml-1 text-[10px]",
+                better ? "text-primary" : "text-destructive",
+              )}
+            >
+              {change > 0 ? "▲" : "▼"}
+            </span>
+          ) : null}
+        </span>
+      </figcaption>
+      <svg
+        viewBox="0 0 100 30"
+        preserveAspectRatio="none"
+        className="mt-1 h-8 w-full"
+        aria-hidden="true"
+      >
+        <polyline
+          points={points}
+          fill="none"
+          stroke={better || !change ? "var(--primary)" : "var(--destructive)"}
+          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </figure>
+  );
+}

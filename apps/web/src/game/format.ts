@@ -1,9 +1,13 @@
 import {
+  BUILDINGS,
   COMMONS_NAMES,
   EVENTS,
   GOALS,
   GOOD_INFO,
   POLICIES,
+  cityInfo,
+  type BuildingKind,
+  type CityId,
   type CommonsId,
   type EventKind,
   type GoalId,
@@ -77,6 +81,44 @@ export function describeEvent(
       return { text: "The game has started. Build your city!", tone: "good" };
     case "game.ended":
       return { text: "The game is over. Great work!", tone: "info" };
+    default:
+      return null;
+  }
+}
+
+function withArticle(name: string): string {
+  return `${/^[AEIOU]/.test(name) ? "an" : "a"} ${name}`;
+}
+
+// What a teammate did, for the team feed: "built a Farm".
+export function describeAction(event: LoggedEvent): string | null {
+  const payload = event.payload;
+  const building = (kind: BuildingKind) => BUILDINGS[kind].name;
+  switch (event.type) {
+    case "building.built":
+      return `built ${withArticle(building((payload.building as { kind: BuildingKind }).kind))}`;
+    case "building.upgraded":
+      return `upgraded ${building(payload.kind as BuildingKind)} to level ${String(payload.after)}`;
+    case "building.demolished":
+      return `removed ${withArticle(building((payload.building as { kind: BuildingKind }).kind))}`;
+    case "building.toggled":
+      return payload.after ? "restarted a building" : "stopped a building";
+    case "market.bought":
+      return `bought ${String(payload.amount)} ${GOOD_INFO[payload.good as Good].name.toLowerCase()}`;
+    case "market.sold":
+      return `sold ${String(payload.amount)} ${GOOD_INFO[payload.good as Good].name.toLowerCase()}`;
+    case "trade.proposed":
+      return `offered a trade to ${cityInfo((payload.offer as { to: CityId }).to).name}`;
+    case "trade.accepted":
+      return `accepted a trade from ${cityInfo((payload.offer as { from: CityId }).from).name}`;
+    case "trade.declined":
+      return "said no to a trade";
+    case "meeting.voted":
+      return `voted ${payload.after ? "yes" : "no"} on ${POLICIES[payload.policyId as PolicyId].name}`;
+    case "reflection.submitted":
+      return "shared a reflection";
+    case "goal.achieved":
+      return `reached a goal: ${GOALS[payload.goal as GoalId].name} 🏆`;
     default:
       return null;
   }

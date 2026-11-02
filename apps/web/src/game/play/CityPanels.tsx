@@ -1,9 +1,14 @@
+import { useState, type FormEvent } from "react";
 import {
   COMMONS_NAMES,
   GOALS,
   POLICIES,
+  REFLECTION_MAX_LENGTH,
+  REFLECTION_PROMPTS,
   type CommonsId,
+  type Contribution,
   type GoalId,
+  type LoggedEvent,
   type PrivateCity,
   type Projection,
   type SeasonReport,
@@ -11,9 +16,138 @@ import {
 import { Check, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { COIN, happinessFace, panel } from "../format";
-import { Meter, Section } from "../ui";
+import { COIN, describeAction, happinessFace, panel } from "../format";
+import { Meter, Section, Sparkline } from "../ui";
 import type { Run } from "./BuildPanel";
+
+const CONTRIBUTION_LABELS: [keyof Contribution, string, string][] = [
+  ["builds", "🏗️", "built"],
+  ["upgrades", "⭐", "upgraded"],
+  ["trades", "🤝", "traded"],
+  ["market", "🛒", "used the market"],
+  ["votes", "🗳️", "voted"],
+  ["reflections", "💭", "reflected"],
+];
+
+export function ContributionChips({
+  contribution,
+}: {
+  contribution?: Contribution;
+}) {
+  const done = CONTRIBUTION_LABELS.filter(
+    ([key]) => (contribution?.[key] ?? 0) > 0,
+  );
+  if (!done.length)
+    return (
+      <span className="text-xs text-muted-foreground">
+        Just getting started
+      </span>
+    );
+  return (
+    <span className="flex flex-wrap gap-1">
+      {done.map(([key, icon, verb]) => (
+        <span
+          key={key}
+          className="rounded bg-secondary px-1.5 text-xs tabular-nums"
+          title={`${verb} ${contribution?.[key]}×`}
+        >
+          {icon} {contribution?.[key]}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function TeamSection({
+  game,
+  events,
+}: {
+  game: Projection;
+  events: LoggedEvent[];
+}) {
+  const team = game.team ?? [];
+  const feed = events
+    .filter(
+      (e) =>
+        e.outcome === "accepted" && e.actorName && e.city === game.me?.cityId,
+    )
+    .map((e) => ({ event: e, text: describeAction(e) }))
+    .filter(
+      (row): row is { event: LoggedEvent; text: string } => row.text !== null,
+    )
+    .slice(-8)
+    .reverse();
+  return (
+    <Section title={`Your team (${team.length})`}>
+      <ul className="space-y-1.5 text-sm">
+        {team.map((member) => (
+          <li
+            key={member.playerId}
+            className="flex items-center justify-between gap-2"
+          >
+            <span
+              className={cn(
+                "font-semibold",
+                member.playerId === game.me?.playerId && "text-primary",
+              )}
+            >
+              {member.name}
+              {member.playerId === game.me?.playerId ? " (you)" : ""}
+            </span>
+            <ContributionChips contribution={member.contribution} />
+          </li>
+        ))}
+      </ul>
+      {feed.length ? (
+        <ol
+          className="mt-3 space-y-1 border-t pt-2 text-xs text-muted-foreground"
+          aria-label="Recent team activity"
+        >
+          {feed.map(({ event, text }) => (
+            <li key={event.seq}>
+              <span className="font-semibold text-foreground">
+                {event.actorName}
+              </span>{" "}
+              {text}
+              <span className="ml-1">· day {event.tick}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Decide together what to build first!
+        </p>
+      )}
+    </Section>
+  );
+}
+
+function Trends({ game, city }: { game: Projection; city: PrivateCity }) {
+  return (
+    <Section title="How things are changing">
+      <div className="grid grid-cols-2 gap-2">
+        <Sparkline
+          label="People"
+          values={city.history.map((h) => h.population)}
+        />
+        <Sparkline
+          label="Happiness"
+          values={city.history.map((h) => h.happiness)}
+        />
+        <Sparkline
+          label="Pollution"
+          values={city.history.map((h) => h.pollution)}
+          goodWhen="down"
+        />
+        <Sparkline
+          label="Region health"
+          values={game.regionHistory.map((h) => h.health)}
+          suffix="%"
+        />
+      </div>
+    </Section>
+  );
+}
 
 export function Leaderboards({
   game,
@@ -90,13 +224,17 @@ export function NatureHealth({ game }: { game: Projection }) {
 export function CityPanel({
   game,
   city,
+  events,
 }: {
   game: Projection;
   city: PrivateCity;
+  events: LoggedEvent[];
 }) {
   const total = city.happinessFactors.reduce((sum, f) => sum + f.value, 0);
   return (
     <div className="space-y-5">
+      <TeamSection game={game} events={events} />
+
       <Section title={`Why people feel ${happinessFace(city.happiness)}`}>
         <ul className="space-y-1 text-sm">
           {city.happinessFactors.map((factor) => (
@@ -129,6 +267,8 @@ export function CityPanel({
           40 or more and there are free homes.
         </p>
       </Section>
+
+      <Trends game={game} city={city} />
 
       <Section title="Nature we share">
         <NatureHealth game={game} />
@@ -312,13 +452,90 @@ function Change({
   );
 }
 
+// The civic part of a season: one question to think about, answered in a
+// sentence or two. The teacher sees every answer; teammates see each other's.
+function Reflection({
+  report,
+  game,
+  run,
+}: {
+  report: SeasonReport;
+  game: Projection;
+  run: Run;
+}) {
+  const [text, setText] = useState("");
+  const [sent, setSent] = useState(false);
+  const prompt =
+    REFLECTION_PROMPTS[(report.season - 1) % REFLECTION_PROMPTS.length];
+  const teamAnswers = game.reflections.filter(
+    (r) => r.season === report.season,
+  );
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (
+      await run(
+        { type: "reflect", payload: { season: report.season, text } },
+        "Thanks for sharing! 💭",
+      )
+    ) {
+      setSent(true);
+    }
+  }
+
+  return (
+    <section className="mt-5 rounded-lg border p-3">
+      <h3 className="text-sm font-bold">💭 Think about it</h3>
+      <p className="mt-1 text-sm">{prompt}</p>
+      {sent ? null : (
+        <form onSubmit={submit} className="mt-2 space-y-2">
+          <label htmlFor="reflection" className="sr-only">
+            Your answer
+          </label>
+          <textarea
+            id="reflection"
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            maxLength={REFLECTION_MAX_LENGTH}
+            rows={3}
+            placeholder="Write a sentence or two. Don't include anyone's real name."
+            className="w-full resize-none rounded-md border bg-background p-2 text-sm"
+          />
+          <Button
+            type="submit"
+            variant="outline"
+            className="h-8 text-xs"
+            disabled={!text.trim()}
+          >
+            Share with my teacher
+          </Button>
+        </form>
+      )}
+      {teamAnswers.length ? (
+        <ul className="mt-3 space-y-1 border-t pt-2 text-sm">
+          {teamAnswers.map((answer) => (
+            <li key={answer.id}>
+              <span className="font-semibold">
+                {answer.author ?? "A teammate"}:
+              </span>{" "}
+              {answer.text}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
 export function SeasonReportModal({
   report,
   game,
+  run,
   onClose,
 }: {
   report: SeasonReport;
   game: Projection;
+  run: Run;
   onClose: () => void;
 }) {
   const result = game.meetingResults.find((r) => r.season === report.season);
@@ -383,6 +600,7 @@ export function SeasonReportModal({
             .
           </p>
         ) : null}
+        <Reflection report={report} game={game} run={run} />
         <Button className="mt-6 w-full" onClick={onClose}>
           On to season {report.season + 1}!
         </Button>

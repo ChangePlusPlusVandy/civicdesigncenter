@@ -23,6 +23,7 @@ import type {
   ActiveEvent,
   Building,
   CityState,
+  HistoryPoint,
   IdleState,
   MeetingResult,
   Phase,
@@ -59,6 +60,7 @@ export interface PrivateCity extends PublicCity {
   happinessFactors: Factor[];
   goals: CityState["goals"];
   lastReport: SeasonReport | null;
+  history: HistoryPoint[];
 }
 
 export interface CommonsView {
@@ -84,10 +86,31 @@ export interface Leaderboard {
   ranking: { cityId: CityId; value: number }[];
 }
 
+// How much each student has done, so teams and teachers can see who's
+// taking part. Counted by the server from accepted actions.
+export interface Contribution {
+  builds: number;
+  upgrades: number;
+  trades: number;
+  market: number;
+  votes: number;
+  reflections: number;
+}
+
 export interface RosterEntry {
   playerId: string;
   name: string;
   cityId: CityId;
+  contribution?: Contribution;
+}
+
+export interface ReflectionView {
+  id: string;
+  season: number;
+  cityId: CityId;
+  text: string;
+  // Teacher and teammates see who wrote it.
+  author: string | null;
 }
 
 export interface Projection {
@@ -103,6 +126,10 @@ export interface Projection {
   // Teacher only.
   allCities: PrivateCity[] | null;
   roster: RosterEntry[] | null;
+  // Player only: the students sharing this city.
+  team: RosterEntry[] | null;
+  regionHistory: IdleState["regionHistory"];
+  reflections: ReflectionView[];
   commons: CommonsView[];
   regionHealth: number;
   market: Record<Good, { stock: number; buy: number; sell: number }>;
@@ -165,6 +192,7 @@ function privateCity(
     happinessFactors: happinessFactors(state, city),
     goals: city.goals,
     lastReport: city.lastReport,
+    history: city.history,
   };
 }
 
@@ -255,6 +283,28 @@ export function project(
           )
         : null,
     roster: audience.kind === "teacher" ? players : null,
+    team:
+      audience.kind === "player"
+        ? players.filter((p) => p.cityId === audience.cityId)
+        : null,
+    regionHistory: state.regionHistory,
+    reflections:
+      audience.kind === "projector"
+        ? []
+        : state.reflections
+            .filter(
+              (r) =>
+                audience.kind === "teacher" || r.cityId === audience.cityId,
+            )
+            .map((r) => ({
+              id: r.id,
+              season: r.season,
+              cityId: r.cityId,
+              text: r.text,
+              author:
+                players.find((p) => p.playerId === r.participantId)?.name ??
+                null,
+            })),
     commons: (Object.keys(state.commons) as CommonsId[]).map((id) => ({
       id,
       name: COMMONS_NAMES[id],

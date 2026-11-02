@@ -16,7 +16,11 @@ import {
 import { normalizeRoomCode } from "@cs/shared";
 import { Button } from "@/components/ui/button";
 import { createGame } from "@/game/api";
-import { Leaderboards, NatureHealth } from "@/game/play/CityPanels";
+import {
+  ContributionChips,
+  Leaderboards,
+  NatureHealth,
+} from "@/game/play/CityPanels";
 import { loadSession, saveSession } from "@/game/session";
 import { COIN, describeEvent, happinessFace, panel } from "@/game/format";
 import { useToasts } from "@/game/hooks";
@@ -330,9 +334,9 @@ function Console({
                           .map((player) => (
                             <li
                               key={player.playerId}
-                              className="flex items-center gap-1"
+                              className="flex flex-wrap items-center gap-1"
                             >
-                              <span className="min-w-0 truncate">
+                              <span className="min-w-0 truncate font-medium">
                                 {player.name}
                               </span>
                               <select
@@ -373,6 +377,11 @@ function Console({
                               >
                                 ✕
                               </button>
+                              <span className="w-full">
+                                <ContributionChips
+                                  contribution={player.contribution}
+                                />
+                              </span>
                             </li>
                           ))}
                       </ul>
@@ -555,6 +564,41 @@ function Console({
           <section className={cn(panel, "p-4 shadow-sm")}>
             <Section title="Leaderboards">
               <Leaderboards game={state} />
+            </Section>
+          </section>
+
+          <section className={cn(panel, "p-4 shadow-sm")}>
+            <Section title={`Reflections (${state.reflections.length})`}>
+              {state.reflections.length ? (
+                <ul className="max-h-72 space-y-2 overflow-y-auto text-sm">
+                  {[...state.reflections].reverse().map((reflection) => {
+                    const city = state.cities.find(
+                      (c) => c.id === reflection.cityId,
+                    );
+                    return (
+                      <li
+                        key={reflection.id}
+                        className="rounded-lg bg-secondary p-2"
+                      >
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span
+                            className="size-2 rounded-full"
+                            style={{ background: city?.color }}
+                          />
+                          {reflection.author ?? "A student"} · {city?.name} ·
+                          season {reflection.season}
+                        </p>
+                        <p className="mt-1">{reflection.text}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Students answer a question on each season report. Their
+                  answers show up here.
+                </p>
+              )}
             </Section>
           </section>
 

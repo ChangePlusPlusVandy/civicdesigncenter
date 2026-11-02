@@ -181,7 +181,10 @@ export class Sandbox {
       const { room, identity } = socket.data as SocketData;
       void socket.join(room.code);
       socket.emit(SERVER_EVENTS.state, room.projectionFor(identity));
-      socket.emit(SERVER_EVENTS.events, room.visibleLog(identity));
+      socket.emit(
+        SERVER_EVENTS.events,
+        room.visibleLog(identity).map((event) => withName(room, event)),
+      );
 
       socket.on(
         CLIENT_EVENTS.action,
@@ -240,7 +243,9 @@ export class Sandbox {
         continue;
       }
       socket.emit(SERVER_EVENTS.state, room.projectionFor(identity));
-      const visible = events.filter((event) => canSee(identity, event));
+      const visible = events
+        .filter((event) => canSee(identity, event))
+        .map((event) => withName(room, event));
       if (visible.length) socket.emit(SERVER_EVENTS.events, visible);
     }
   }
@@ -252,6 +257,13 @@ function currentIdentity(room: GameRoom, identity: Identity): Identity | null {
   if (identity.kind !== "player") return identity;
   const player = room.playerFor(identity.player.token);
   return player ? { kind: "player", player } : null;
+}
+
+// Every event a viewer may see is either their own city's (teammates know
+// each other's names) or game-wide (which has no actor), so naming is safe.
+function withName(room: GameRoom, event: LoggedEvent): LoggedEvent {
+  const actorName = room.nameOf(event.participantId);
+  return actorName ? { ...event, actorName } : event;
 }
 
 function canSee(identity: Identity, event: LoggedEvent): boolean {

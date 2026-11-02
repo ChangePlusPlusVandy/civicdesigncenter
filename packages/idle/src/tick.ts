@@ -10,6 +10,8 @@ import {
   GROWTH_MIN_HAPPINESS,
   GROWTH_RATE,
   HAPPINESS_EASE,
+  HISTORY_EVERY,
+  HISTORY_LENGTH,
   MARKET,
   POLLUTION_DECAY,
   RECOVERED,
@@ -25,6 +27,7 @@ import {
   buildingRates,
   housing,
   parkCleaning,
+  regionHealth,
   round3,
   targetHappiness,
 } from "./economy.ts";
@@ -123,6 +126,29 @@ export function runTick(state: IdleState): ReduceResult {
   }
 
   const tick = state.tick + 1;
+  let regionHistory = state.regionHistory;
+  if (tick % HISTORY_EVERY === 0) {
+    for (const id of state.cityIds) {
+      const city = cities[id];
+      if (!city) continue;
+      cities[id] = {
+        ...city,
+        history: [
+          ...city.history,
+          {
+            tick,
+            population: city.population,
+            happiness: Math.round(city.happiness),
+            pollution: Math.round(city.pollution * 10) / 10,
+          },
+        ].slice(-HISTORY_LENGTH),
+      };
+    }
+    regionHistory = [
+      ...regionHistory,
+      { tick, health: regionHealth({ ...state, commons }) },
+    ].slice(-HISTORY_LENGTH);
+  }
   const offers = state.offers.map((offer) =>
     offer.status === "open" &&
     tick - offer.createdTick >= TRADE.expiresAfterTicks
@@ -139,6 +165,7 @@ export function runTick(state: IdleState): ReduceResult {
       commons,
       market,
       offers,
+      regionHistory,
       events: state.events.filter((event) => event.untilTick > tick),
     },
     events,
@@ -157,9 +184,27 @@ function work(
   let riverRunoff = 0;
   const goods = { ...city.goods };
 
+  // Adds a building's output to the city's goods (up to storage) and
+  // returns what actually fit, for the popups.
+  const produce = (output: Partial<Record<Good, number>>) => {
+    const made: Partial<Record<Good, number>> = {};
+    for (const [good, amount] of Object.entries(output) as [Good, number][]) {
+      const before = goods[good];
+      goods[good] = round3(Math.min(before + amount, STORAGE_CAP));
+      made[good] = round3(goods[good] - before);
+    }
+    return made;
+  };
+
   const buildings = city.buildings.map((building): Building => {
     const def = BUILDINGS[building.kind];
-    if (!def.workers) return { ...building, status: "ok", lastOutput: {} };
+    // Homes, parks and the hall need no workers; the hall's garden still grows.
+    if (!def.workers) {
+      const lastOutput = def.output
+        ? produce(buildingRates(state, building).output)
+        : {};
+      return { ...building, status: "ok", lastOutput };
+    }
     if (!building.running)
       return { ...building, status: "stopped", lastOutput: {} };
     if (workersLeft < def.workers)
@@ -178,16 +223,7 @@ function work(
     workersLeft -= def.workers;
     pollution += rates.pollution;
     riverRunoff += rates.riverPollution;
-    const lastOutput: Partial<Record<Good, number>> = {};
-    for (const [good, amount] of Object.entries(rates.output) as [
-      Good,
-      number,
-    ][]) {
-      const before = goods[good];
-      goods[good] = round3(Math.min(before + amount, STORAGE_CAP));
-      lastOutput[good] = round3(goods[good] - before);
-    }
-    return { ...building, status: "ok", lastOutput };
+    return { ...building, status: "ok", lastOutput: produce(rates.output) };
   });
 
   const cleaned = Math.max(

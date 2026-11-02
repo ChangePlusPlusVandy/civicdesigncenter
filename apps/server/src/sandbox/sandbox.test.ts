@@ -440,6 +440,64 @@ describe("sandbox over sockets", () => {
     );
   });
 
+  it("shows teammates who did what, keeps names out of the log", async () => {
+    const h = await start();
+    // Two cities, four students: Ana and Cy share one city, Ben and Dee the other.
+    const created = await post<CreateGameResponse>(h, "/games", {
+      cityCount: 2,
+    });
+    const { code, teacherToken } = created.body;
+    const teacher = await connect(h, { code, token: teacherToken });
+    const joined: JoinResponse[] = [];
+    for (const name of ["Ana", "Ben", "Cy", "Dee"]) {
+      joined.push(
+        (await post<JoinResponse>(h, `/games/${code}/join`, { name })).body,
+      );
+    }
+    const [ana, ben, cy] = (await Promise.all(
+      joined.slice(0, 3).map((j) => connect(h, { code, token: j.token })),
+    )) as [Client, Client, Client];
+    expect(joined[0]?.cityId).toBe(joined[2]?.cityId);
+    await teacher.act({ type: "start" });
+    await ana.waitFor((p) => p.phase === "running");
+
+    await ana.act({ type: "marketSell", payload: { good: "wood", amount: 1 } });
+    await ana.act({
+      type: "reflect",
+      payload: { season: 1, text: "Keep the river clean" },
+    });
+
+    await cy.waitFor(() =>
+      cy.events.some((e) => e.type === "market.sold" && e.actorName === "Ana"),
+    );
+    const team = await cy.waitFor(
+      (p) => p.team?.find((m) => m.name === "Ana")?.contribution?.market === 1,
+    );
+    expect(team.team?.map((m) => m.name).sort()).toEqual(["Ana", "Cy"]);
+    expect(team.reflections[0]).toMatchObject({
+      text: "Keep the river clean",
+      author: "Ana",
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(ben.events.some((e) => e.type === "market.sold")).toBe(false);
+    expect(ben.state.reflections).toEqual([]);
+
+    const roster = await teacher.waitFor(
+      (p) =>
+        p.roster?.find((r) => r.name === "Ana")?.contribution?.reflections ===
+        1,
+    );
+    expect(roster.reflections.map((r) => r.author)).toEqual(["Ana"]);
+
+    const log = (await (
+      await fetch(`${h.baseUrl}/api/sandbox/games/${code}/log`, {
+        headers: { authorization: `Bearer ${teacherToken}` },
+      })
+    ).json()) as LoggedEvent[];
+    expect(JSON.stringify(log)).not.toContain("Ana");
+  });
+
   it("ticks on its own while running, and stops when paused", async () => {
     const h = await start(20);
     const { teacher, students } = await classroom(h, ["Ana"]);
