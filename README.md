@@ -62,6 +62,8 @@ Run from the repository root:
 - `npm run build` — build the web client, then the server
 - `npm start` — run the built server (set `NODE_ENV=production` to also serve the client)
 - `npm test` — run all tests (Vitest)
+- `npm run test:e2e` — browser tests with Playwright (run `npx playwright install chromium` once)
+- `npm run bots -- --create --players 30` — simulate a class against a running server
 - `npm run typecheck` — type-check every workspace
 - `npm run lint` — lint with oxlint
 - `npm run format` / `npm run format:check` — format with Prettier
@@ -71,6 +73,7 @@ To run a script in one workspace, use `-w`, for example `npm run dev -w apps/web
 ## Docs
 
 - [Architecture and tech stack](docs/ARCHITECTURE.md)
+- [Idle-builder prototype: design, screens, testing](docs/IDLE-PROTOTYPE.md)
 - [Contributing: workflow, reviews, check-ins](CONTRIBUTING.md)
 
 ## References
