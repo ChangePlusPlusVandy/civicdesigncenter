@@ -7,6 +7,7 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY apps/server/package.json apps/server/
 COPY packages/engine/package.json packages/engine/
+COPY packages/idle/package.json packages/idle/
 COPY packages/shared/package.json packages/shared/
 RUN npm ci
 COPY . .
@@ -19,6 +20,7 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/
 COPY apps/server/package.json apps/server/
 COPY packages/engine/package.json packages/engine/
+COPY packages/idle/package.json packages/idle/
 COPY packages/shared/package.json packages/shared/
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/apps/server/dist apps/server/dist

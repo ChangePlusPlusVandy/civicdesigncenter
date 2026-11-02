@@ -27,6 +27,8 @@ dist-ssr
 
 # Local PGlite database (see .env.example)
 .pglite/
+.pglite-sandbox/
+.pglite-e2e/
 
 # Playwright
 test-results/

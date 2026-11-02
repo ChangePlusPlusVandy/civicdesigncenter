@@ -16,7 +16,8 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: `npm run build && NODE_ENV=production PORT=${PORT} npm start`,
+    // Its own PGlite folder, so it never shares one with a running dev server.
+    command: `npm run build && NODE_ENV=production PORT=${PORT} SANDBOX_PGLITE_DIR=./.pglite-e2e npm start`,
     url: `http://localhost:${PORT}/healthz`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

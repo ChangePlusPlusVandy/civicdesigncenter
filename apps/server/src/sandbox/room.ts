@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   TICK_MS,
   createGame,
@@ -17,13 +17,9 @@ import {
   type Projection,
   type RosterEntry,
 } from "@cs/idle";
+import type { SavedGame, SavedPlayer } from "./store.ts";
 
-export interface Player {
-  id: string;
-  token: string;
-  name: string;
-  cityId: CityId;
-}
+export type Player = SavedPlayer;
 
 export type Identity =
   | { kind: "teacher" }
@@ -36,6 +32,8 @@ export interface RoomOptions {
   // Milliseconds per tick at speed ×1. 0 turns the timer off (tests tick by hand).
   tickMs?: number;
   onChange?: (room: GameRoom, events: LoggedEvent[]) => void;
+  // Picks up a saved game instead of starting a new one.
+  restore?: { game: SavedGame; log: LoggedEvent[] };
 }
 
 const CONTRIBUTION_KEYS: Record<string, keyof Contribution> = {
@@ -60,16 +58,25 @@ function emptyContribution(): Contribution {
   };
 }
 
+export function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+const newToken = () => randomBytes(18).toString("base64url");
+
 const NAME_PATTERN = /^[\p{L}\p{N} _'-]{2,24}$/u;
 const MAX_LOG = 5000;
 const MAX_SEEN = 2000;
 
 export class GameRoom {
-  readonly teacherToken = randomBytes(18).toString("base64url");
+  // Only known right after creating the game; the server keeps just a hash.
+  readonly teacherToken: string | null;
+  private readonly teacherTokenHash: string;
   state: IdleState;
   version = 1;
   lastActivity = Date.now();
   readonly log: LoggedEvent[] = [];
+  // By token hash.
   private readonly players = new Map<string, Player>();
   private readonly contributions = new Map<string, Contribution>();
   // clientActionId -> version it produced, so retries are safe.
@@ -79,17 +86,59 @@ export class GameRoom {
   private timerInterval = 0;
   private readonly tickMs: number;
   private readonly onChange: RoomOptions["onChange"];
+  // Waiting to be saved.
+  private dirty = true;
+  private unsaved: LoggedEvent[] = [];
 
   constructor(
     readonly code: string,
     options: RoomOptions = {},
   ) {
-    this.state = createGame(options.cityCount ?? 5, options.mapId);
     this.tickMs = options.tickMs ?? TICK_MS;
     this.onChange = options.onChange;
+    const saved = options.restore?.game;
+    if (saved) {
+      this.teacherToken = null;
+      this.teacherTokenHash = saved.teacherTokenHash;
+      this.state = saved.state;
+      this.version = saved.version;
+      this.seq = saved.seq;
+      this.lastActivity = saved.lastActivity;
+      for (const player of saved.players)
+        this.players.set(player.tokenHash, player);
+      for (const [id, counts] of Object.entries(saved.contributions)) {
+        this.contributions.set(id, counts);
+      }
+      this.log.push(...(options.restore?.log ?? []));
+      this.dirty = false;
+      this.resumeAfterRestart();
+    } else {
+      this.teacherToken = newToken();
+      this.teacherTokenHash = hashToken(this.teacherToken);
+      this.state = createGame(options.cityCount ?? 5, options.mapId);
+    }
   }
 
-  join(rawName: string): Player | { error: string; message: string } {
+  // A game that was running when the server stopped comes back paused, so
+  // the teacher picks the moment to carry on.
+  private resumeAfterRestart() {
+    const events: GameEvent[] = [
+      { type: "game.restored", payload: { version: this.version } },
+    ];
+    if (this.state.phase === "running") {
+      const paused = reduce(this.state, { kind: "teacher" }, { type: "pause" });
+      if (paused.ok) {
+        this.state = paused.state;
+        events.push(...paused.events);
+      }
+    }
+    this.version += 1;
+    this.record(events, "system");
+  }
+
+  join(
+    rawName: string,
+  ): { player: Player; token: string } | { error: string; message: string } {
     const name = rawName.trim().replace(/\s+/g, " ");
     if (!NAME_PATTERN.test(name)) {
       return {
@@ -109,15 +158,23 @@ export class GameRoom {
     if (this.state.phase === "ended") {
       return { error: "GAME_ENDED", message: "This game has ended." };
     }
+    const token = newToken();
     const player: Player = {
       id: randomUUID(),
-      token: randomBytes(18).toString("base64url"),
+      tokenHash: hashToken(token),
       name,
       cityId: this.smallestTeam(),
     };
-    this.players.set(player.token, player);
-    this.changed([]);
-    return player;
+    this.players.set(player.tokenHash, player);
+    this.version += 1;
+    this.changed(
+      this.record(
+        [{ type: "player.joined", city: player.cityId, payload: {} }],
+        "system",
+        player.id,
+      ),
+    );
+    return { player, token };
   }
 
   // New players join the city with the fewest players.
@@ -129,9 +186,13 @@ export class GameRoom {
     return [...counts.entries()].sort((a, b) => a[1] - b[1])[0]?.[0] ?? "red";
   }
 
+  isTeacher(token: string | undefined): boolean {
+    return Boolean(token) && hashToken(token ?? "") === this.teacherTokenHash;
+  }
+
   authenticate(token: string): Identity | null {
-    if (token === this.teacherToken) return { kind: "teacher" };
-    const player = this.players.get(token);
+    if (this.isTeacher(token)) return { kind: "teacher" };
+    const player = this.players.get(hashToken(token));
     return player ? { kind: "player", player } : null;
   }
 
@@ -191,9 +252,7 @@ export class GameRoom {
   }
 
   admin(message: AdminMessage): Ack {
-    const player = [...this.players.values()].find(
-      (p) => p.id === message.playerId,
-    );
+    const player = this.playerById(message.playerId);
     if (!player)
       return { ok: false, code: "NOT_FOUND", message: "No such player." };
     if (message.type === "movePlayer") {
@@ -202,7 +261,7 @@ export class GameRoom {
       }
       player.cityId = message.cityId;
     } else {
-      this.players.delete(player.token);
+      this.players.delete(player.tokenHash);
     }
     this.version += 1;
     this.changed(
@@ -245,8 +304,8 @@ export class GameRoom {
     this.timerInterval = 0;
   }
 
-  playerFor(token: string): Player | undefined {
-    return this.players.get(token);
+  playerById(id: string): Player | undefined {
+    return [...this.players.values()].find((player) => player.id === id);
   }
 
   roster(): RosterEntry[] {
@@ -262,7 +321,7 @@ export class GameRoom {
   // research log; they're added only on the way out to the same team.
   nameOf(participantId: string | undefined): string | undefined {
     if (!participantId) return undefined;
-    return [...this.players.values()].find((p) => p.id === participantId)?.name;
+    return this.playerById(participantId)?.name;
   }
 
   private count(participantId: string, type: string) {
@@ -301,6 +360,27 @@ export class GameRoom {
     return rows.slice(-limit);
   }
 
+  // Everything needed to bring this game back after a restart.
+  snapshot(): SavedGame {
+    return {
+      code: this.code,
+      state: this.state,
+      version: this.version,
+      teacherTokenHash: this.teacherTokenHash,
+      players: [...this.players.values()],
+      contributions: Object.fromEntries(this.contributions),
+      seq: this.seq,
+      lastActivity: this.lastActivity,
+    };
+  }
+
+  // What changed since the last save, or null if nothing did.
+  takeUnsaved(): { game: SavedGame; events: LoggedEvent[] } | null {
+    if (!this.dirty) return null;
+    this.dirty = false;
+    return { game: this.snapshot(), events: this.unsaved.splice(0) };
+  }
+
   private record(
     events: GameEvent[],
     actor: LoggedEvent["actor"],
@@ -321,6 +401,8 @@ export class GameRoom {
     this.log.push(...rows);
     if (this.log.length > MAX_LOG)
       this.log.splice(0, this.log.length - MAX_LOG);
+    this.unsaved.push(...rows);
+    this.dirty = true;
     return rows;
   }
 
@@ -333,6 +415,7 @@ export class GameRoom {
   }
 
   private changed(events: LoggedEvent[]) {
+    this.dirty = true;
     this.onChange?.(this, events);
   }
 }

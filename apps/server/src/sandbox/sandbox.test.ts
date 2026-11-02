@@ -32,7 +32,7 @@ const open: { harness?: Harness; clients: Client[] } = { clients: [] };
 afterEach(async () => {
   for (const client of open.clients) client.socket.disconnect();
   open.clients = [];
-  open.harness?.sandbox.close();
+  await open.harness?.sandbox.close();
   await new Promise<void>(
     (resolve) => open.harness?.server.close(() => resolve()) ?? resolve(),
   );
