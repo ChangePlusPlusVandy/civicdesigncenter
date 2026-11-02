@@ -42,6 +42,8 @@ import { clearSession, loadSession, type Session } from "@/game/session";
 import { COIN, describeEvent, happinessFace, panel } from "@/game/format";
 import { useToasts } from "@/game/hooks";
 import { Stat, Toasts } from "@/game/ui";
+import { advise, type Tip } from "@/game/advisor";
+import { AdvisorCard } from "@/game/play/Advisor";
 import { useGame, type GameConnection } from "@/game/useGame";
 import { cn } from "@/lib/utils";
 import type { PlacementCell } from "@/world/Markers";
@@ -279,6 +281,18 @@ function PlayView({
       : `Tap a green tile to build your ${BUILDINGS[placing].name}. Esc to cancel.`
     : null;
 
+  const tips = useMemo(() => advise(state, city), [state, city]);
+
+  function handleTip(tip: Tip) {
+    setSelected(null);
+    if (tip.action?.build) {
+      setTab("build");
+      setPlacing(tip.action.build);
+    } else if (tip.action?.tab) {
+      setTab(tip.action.tab);
+    }
+  }
+
   const report =
     city.lastReport && city.lastReport.season > reportSeen
       ? city.lastReport
@@ -317,7 +331,7 @@ function PlayView({
           </Suspense>
         </WebGLBoundary>
 
-        <header className="pointer-events-none absolute inset-x-0 top-0 p-3">
+        <header className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-start gap-2 p-3">
           <div
             className={cn(
               panel,
@@ -407,6 +421,9 @@ function PlayView({
               />
             </div>
           </div>
+          {state.phase === "running" && !placing ? (
+            <AdvisorCard tips={tips} onAction={handleTip} />
+          ) : null}
         </header>
 
         {hint ? (
@@ -511,7 +528,7 @@ function PlayView({
               ) : tab === "trade" ? (
                 <TradePanel game={state} city={city} run={run} />
               ) : (
-                <CityPanel game={state} city={city} />
+                <CityPanel game={state} city={city} events={game.events} />
               )}
             </div>
           </>
@@ -525,6 +542,7 @@ function PlayView({
         <SeasonReportModal
           report={report}
           game={state}
+          run={run}
           onClose={() => setReportSeen(report.season)}
         />
       ) : null}

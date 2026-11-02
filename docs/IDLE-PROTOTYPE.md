@@ -32,6 +32,23 @@ This prototype keeps the commons lesson and changes the rest:
 - **Several ways to win.** Biggest, Happiest, Greenest and Best Trader, plus a
   shared Region Health bar.
 
+## Each student's experience
+
+- **An advisor** suggests the single most useful next step ("Start with food:
+  a Farm feeds your people"), with a button that does it. Problems come first
+  (hunger, full homes, no workers, pollution, a used-up river); ideas can be
+  dismissed.
+- **A town garden.** The town hall grows 0.5 food a day, so a new city feeds
+  its first people while students learn, but it needs farms to grow.
+- **Your team.** Who shares your city, what each person has done (built,
+  upgraded, traded, used the market, voted, reflected), and a feed like "Ana
+  built a Farm". Names reach only teammates and the teacher; the research log
+  stays pseudonymous.
+- **Trends.** Sparklines for people, happiness, pollution and region health.
+- **Reflection.** Each season report asks one question (for example "Did your
+  city's choices help or hurt the other cities?"). Answers go to the teacher
+  console, which also shows each student's activity, and to teammates.
+
 ## The commons, and proof the lesson works
 
 The river (fish) and the two woods (wood, animals) regrow logistically:

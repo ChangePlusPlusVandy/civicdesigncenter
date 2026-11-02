@@ -32,6 +32,11 @@ test("a teacher and two students play one game together", async ({
   await teacher.getByRole("button", { name: "Start game" }).click();
   await expect(ana.getByText(/Day [1-9]/)).toBeVisible({ timeout: 15_000 });
 
+  // The advisor suggests a first step.
+  await expect(ana.getByRole("region", { name: "Advisor" })).toContainText(
+    /Farm/,
+  );
+
   // Ana builds a farm from the spot picker.
   await ana.getByRole("button", { name: /^Farm/ }).click();
   await ana
@@ -60,6 +65,12 @@ test("a teacher and two students play one game together", async ({
   for (const student of [ana, ben]) {
     await expect(student.getByText("Season 1 report")).toBeVisible();
   }
+
+  // Ana answers the reflection question; the teacher reads it.
+  await ana.getByLabel("Your answer").fill("We should share the river.");
+  await ana.getByRole("button", { name: "Share with my teacher" }).click();
+  await expect(teacher.getByText("We should share the river.")).toBeVisible();
+  await expect(teacher.getByText(/Ana · .* · season 1/)).toBeVisible();
 
   const projector = await (await browser.newContext()).newPage();
   await projector.goto(`/projector/${code}`);

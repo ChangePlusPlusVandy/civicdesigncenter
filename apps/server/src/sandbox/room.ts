@@ -9,6 +9,7 @@ import {
   type AdminMessage,
   type CityId,
   type ClientIntent,
+  type Contribution,
   type GameEvent,
   type IdleState,
   type LoggedEvent,
@@ -35,6 +36,28 @@ export interface RoomOptions {
   onChange?: (room: GameRoom, events: LoggedEvent[]) => void;
 }
 
+const CONTRIBUTION_KEYS: Record<string, keyof Contribution> = {
+  build: "builds",
+  upgrade: "upgrades",
+  proposeTrade: "trades",
+  acceptTrade: "trades",
+  marketBuy: "market",
+  marketSell: "market",
+  vote: "votes",
+  reflect: "reflections",
+};
+
+function emptyContribution(): Contribution {
+  return {
+    builds: 0,
+    upgrades: 0,
+    trades: 0,
+    market: 0,
+    votes: 0,
+    reflections: 0,
+  };
+}
+
 const NAME_PATTERN = /^[\p{L}\p{N} _'-]{2,24}$/u;
 const MAX_LOG = 5000;
 const MAX_SEEN = 2000;
@@ -46,6 +69,7 @@ export class GameRoom {
   lastActivity = Date.now();
   readonly log: LoggedEvent[] = [];
   private readonly players = new Map<string, Player>();
+  private readonly contributions = new Map<string, Contribution>();
   // clientActionId -> version it produced, so retries are safe.
   private readonly seen = new Map<string, number>();
   private seq = 0;
@@ -125,7 +149,11 @@ export class GameRoom {
 
     const actor: Actor =
       identity.kind === "player"
-        ? { kind: "player", cityId: identity.player.cityId }
+        ? {
+            kind: "player",
+            cityId: identity.player.cityId,
+            participantId: identity.player.id,
+          }
         : { kind: "teacher" };
     const participantId =
       identity.kind === "player" ? identity.player.id : undefined;
@@ -154,6 +182,7 @@ export class GameRoom {
     this.state = result.state;
     this.version += 1;
     this.remember(key);
+    if (participantId) this.count(participantId, intent.type);
     this.changed(this.record(result.events, actor.kind, participantId));
     this.schedule();
     return { ok: true, version: this.version };
@@ -223,7 +252,23 @@ export class GameRoom {
       playerId: player.id,
       name: player.name,
       cityId: player.cityId,
+      contribution: this.contributions.get(player.id) ?? emptyContribution(),
     }));
+  }
+
+  // Who did something, for teammates' activity feeds. Names never go into the
+  // research log; they're added only on the way out to the same team.
+  nameOf(participantId: string | undefined): string | undefined {
+    if (!participantId) return undefined;
+    return [...this.players.values()].find((p) => p.id === participantId)?.name;
+  }
+
+  private count(participantId: string, type: string) {
+    const key = CONTRIBUTION_KEYS[type];
+    if (!key) return;
+    const counts = this.contributions.get(participantId) ?? emptyContribution();
+    counts[key] += 1;
+    this.contributions.set(participantId, counts);
   }
 
   projectionFor(identity: Identity): Projection {

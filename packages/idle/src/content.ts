@@ -77,9 +77,13 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   hall: {
     name: "Town Hall",
     icon: "🏛️",
-    blurb: "The heart of your city. Gives homes for 6 people.",
+    blurb:
+      "The heart of your city. Gives homes for 6 people, and its garden grows a little food.",
     cost: {},
     workers: 0,
+    // The town garden: enough to feed the first few people while students
+    // learn, never enough to grow on.
+    output: { food: 0.5 },
     housing: 6,
   },
   house: {
@@ -345,6 +349,22 @@ export const GOALS: Record<GoalId, { name: string; hint: string }> = {
     hint: "Have 6+ buildings with pollution under 5.",
   },
 };
+
+// City and region trends for the charts: a sample every few ticks, the
+// most recent ones kept.
+export const HISTORY_EVERY = 5;
+export const HISTORY_LENGTH = 60;
+
+export const REFLECTION_MAX_LENGTH = 400;
+export const MAX_REFLECTIONS = 500;
+
+// Asked on the season report. Rotates by season.
+export const REFLECTION_PROMPTS = [
+  "What changed in the river and woods this season? Why do you think it happened?",
+  "Did your city's choices help or hurt the other cities? How?",
+  "If you could make one rule for every city, what would it be, and why?",
+  "What would you tell a new city to do first, and why?",
+];
 
 export const SPEEDS = [1, 2, 4] as const;
 export type Speed = (typeof SPEEDS)[number];

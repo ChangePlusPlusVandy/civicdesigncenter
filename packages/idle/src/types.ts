@@ -42,6 +42,23 @@ export interface SeasonReport {
   commons: Record<CommonsId, { before: number; after: number }>;
 }
 
+export interface HistoryPoint {
+  tick: number;
+  population: number;
+  happiness: number;
+  pollution: number;
+}
+
+export interface Reflection {
+  id: string;
+  season: number;
+  cityId: CityId;
+  // Pseudonymous; the server maps it to a name for the teacher only.
+  participantId: string | null;
+  text: string;
+  tick: number;
+}
+
 export interface CityState {
   id: CityId;
   coins: number;
@@ -56,6 +73,7 @@ export interface CityState {
   tradesCompleted: number;
   seasonStart: SeasonSnapshot;
   lastReport: SeasonReport | null;
+  history: HistoryPoint[];
 }
 
 export interface CommonsState {
@@ -109,6 +127,8 @@ export interface IdleState {
   events: ActiveEvent[];
   // River and woods health (0-100) when the season began, for the report.
   seasonStartHealth: Record<CommonsId, number>;
+  regionHistory: { tick: number; health: number }[];
+  reflections: Reflection[];
 }
 
 export type PlayerIntent =
@@ -122,7 +142,8 @@ export type PlayerIntent =
   | { type: "acceptTrade"; payload: { offerId: string } }
   | { type: "declineTrade"; payload: { offerId: string } }
   | { type: "cancelTrade"; payload: { offerId: string } }
-  | { type: "vote"; payload: { policyId: PolicyId; yes: boolean } };
+  | { type: "vote"; payload: { policyId: PolicyId; yes: boolean } }
+  | { type: "reflect"; payload: { season: number; text: string } };
 
 export type TeacherIntent =
   | { type: "start"; payload?: undefined }
@@ -138,7 +159,9 @@ export type Intent =
   PlayerIntent | TeacherIntent | { type: "tick"; payload?: undefined };
 
 export type Actor =
-  { kind: "player"; cityId: CityId } | { kind: "teacher" } | { kind: "system" };
+  | { kind: "player"; cityId: CityId; participantId?: string }
+  | { kind: "teacher" }
+  | { kind: "system" };
 
 export type ErrorCode =
   | "UNKNOWN_ACTION"

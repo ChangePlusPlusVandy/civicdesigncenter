@@ -57,6 +57,8 @@ export interface LoggedEvent extends GameEvent {
   participantId?: string;
   outcome: "accepted" | "rejected";
   errorCode?: string;
+  // Added only when sent to the actor's own team (or the teacher); never stored.
+  actorName?: string;
 }
 
 // REST, under /api/sandbox.

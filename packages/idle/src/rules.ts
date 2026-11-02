@@ -9,7 +9,9 @@ import {
   GOODS,
   MARKET,
   MAX_LEVEL,
+  MAX_REFLECTIONS,
   POLICIES,
+  REFLECTION_MAX_LENGTH,
   SPEEDS,
   START,
   STORAGE_CAP,
@@ -87,6 +89,7 @@ export function createGame(cityCount = 5): IdleState {
       tradesCompleted: 0,
       seasonStart: { population: 0, coins: 0, happiness: 0, pollution: 0 },
       lastReport: null,
+      history: [],
     };
     cities[id] = { ...city, seasonStart: snapshot(city) };
   }
@@ -120,6 +123,8 @@ export function createGame(cityCount = 5): IdleState {
     policies: [],
     events: [],
     seasonStartHealth: { river: 0, westWoods: 0, eastWoods: 0 },
+    regionHistory: [],
+    reflections: [],
   };
   return { ...state, seasonStartHealth: healthSnapshot(state) };
 }
@@ -162,20 +167,22 @@ function isWhole(amount: unknown, max = Infinity): amount is number {
   );
 }
 
-// Players may vote only during a meeting; everything else needs the game
-// to be running.
-const PLAYER_INTENTS: Record<PlayerIntent["type"], Phase> = {
-  build: "running",
-  upgrade: "running",
-  demolish: "running",
-  toggle: "running",
-  marketBuy: "running",
-  marketSell: "running",
-  proposeTrade: "running",
-  acceptTrade: "running",
-  declineTrade: "running",
-  cancelTrade: "running",
-  vote: "meeting",
+// Players may vote only during a meeting and reflect any time after the
+// start; everything else needs the game to be running.
+const RUNNING: Phase[] = ["running"];
+const PLAYER_INTENTS: Record<PlayerIntent["type"], Phase[]> = {
+  build: RUNNING,
+  upgrade: RUNNING,
+  demolish: RUNNING,
+  toggle: RUNNING,
+  marketBuy: RUNNING,
+  marketSell: RUNNING,
+  proposeTrade: RUNNING,
+  acceptTrade: RUNNING,
+  declineTrade: RUNNING,
+  cancelTrade: RUNNING,
+  vote: ["meeting"],
+  reflect: ["running", "paused", "meeting", "ended"],
 };
 
 export function reduce(
@@ -198,7 +205,7 @@ export function reduce(
   if (!city) return fail("NOT_FOUND", "Your city isn't in this game.");
   const needed = PLAYER_INTENTS[intent.type as PlayerIntent["type"]];
   if (!needed) return fail("NOT_ALLOWED", `Players can't ${intent.type}.`);
-  if (state.phase !== needed) {
+  if (!needed.includes(state.phase)) {
     const message =
       state.phase === "meeting"
         ? "The Town Meeting is on. Vote first!"
@@ -246,6 +253,8 @@ export function reduce(
       return closeTrade(state, city, intent.payload.offerId, intent.type);
     case "vote":
       return vote(state, city, intent.payload.policyId, intent.payload.yes);
+    case "reflect":
+      return reflect(state, city, actor.participantId ?? null, intent.payload);
   }
   return fail("NOT_ALLOWED", `Players can't ${intent.type}.`);
 }
@@ -600,6 +609,49 @@ function vote(
         type: "meeting.voted",
         city: city.id,
         payload: { policyId, before: before ?? null, after: yes },
+      },
+    ],
+  );
+}
+
+// A student's answer to the season's reflection question. Kept for the
+// teacher and the research log; it doesn't change the game.
+function reflect(
+  state: IdleState,
+  city: CityState,
+  participantId: string | null,
+  payload: { season: number; text: string },
+): ReduceResult {
+  const text = typeof payload?.text === "string" ? payload.text.trim() : "";
+  const season = payload?.season;
+  if (!text || text.length > REFLECTION_MAX_LENGTH) {
+    return fail(
+      "BAD_REQUEST",
+      `Write 1 to ${REFLECTION_MAX_LENGTH} characters.`,
+    );
+  }
+  if (!Number.isInteger(season) || season < 1 || season > state.season) {
+    return fail("BAD_REQUEST", "That season hasn't happened yet.");
+  }
+  const reflection = {
+    id: `r${state.nextId}`,
+    season,
+    cityId: city.id,
+    participantId,
+    text,
+    tick: state.tick,
+  };
+  return ok(
+    {
+      ...state,
+      nextId: state.nextId + 1,
+      reflections: [...state.reflections, reflection].slice(-MAX_REFLECTIONS),
+    },
+    [
+      {
+        type: "reflection.submitted",
+        city: city.id,
+        payload: { season, text },
       },
     ],
   );

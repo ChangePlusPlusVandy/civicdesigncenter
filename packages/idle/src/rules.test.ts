@@ -377,3 +377,90 @@ describe("projection", () => {
     expect(teacherView.allCities).toHaveLength(5);
   });
 });
+
+describe("starting out", () => {
+  it("the town garden keeps an idle new city from starving", () => {
+    let state = running();
+    for (let i = 0; i < 200; i++)
+      state = apply(state, system, { type: "tick" });
+    expect(city(state).population).toBeGreaterThanOrEqual(START.population);
+    expect(city(state).buildings[0]?.lastOutput.food).toBe(0.5);
+  });
+
+  it("records city and region trends every few days", () => {
+    let state = running();
+    for (let i = 0; i < 12; i++) state = apply(state, system, { type: "tick" });
+    expect(city(state).history.map((point) => point.tick)).toEqual([5, 10]);
+    expect(state.regionHistory).toHaveLength(2);
+    expect(state.regionHistory[0]?.health).toBeGreaterThan(50);
+  });
+});
+
+describe("reflections", () => {
+  const ana: Actor = {
+    kind: "player",
+    cityId: "green",
+    participantId: "p-ana",
+  };
+
+  it("saves a student's answer without changing the game", () => {
+    const paused = apply(running(), teacher, { type: "pause" });
+    const state = apply(paused, ana, {
+      type: "reflect",
+      payload: { season: 1, text: "  We used too many docks.  " },
+    });
+    expect(state.reflections).toEqual([
+      expect.objectContaining({
+        season: 1,
+        cityId: "green",
+        participantId: "p-ana",
+        text: "We used too many docks.",
+      }),
+    ]);
+    expect(state.cities).toEqual(paused.cities);
+  });
+
+  it("rejects empty, too long, future and lobby reflections", () => {
+    const state = running();
+    const say = (text: string, season = 1) => ({
+      type: "reflect" as const,
+      payload: { season, text },
+    });
+    expect(errorOf(state, ana, say("   "))).toBe("BAD_REQUEST");
+    expect(errorOf(state, ana, say("x".repeat(401)))).toBe("BAD_REQUEST");
+    expect(errorOf(state, ana, say("hi", 2))).toBe("BAD_REQUEST");
+    expect(errorOf(createGame(5), ana, say("hi"))).toBe("WRONG_PHASE");
+  });
+
+  it("shows answers to the team and teacher, not other cities or the projector", () => {
+    const state = apply(running(), ana, {
+      type: "reflect",
+      payload: { season: 1, text: "Share the river" },
+    });
+    const players = [
+      { playerId: "p-ana", name: "Ana", cityId: "green" as const },
+      { playerId: "p-bo", name: "Bo", cityId: "blue" as const },
+    ];
+    const view = (audience: Parameters<typeof project>[1]) =>
+      project(state, audience, 1, players);
+
+    expect(view({ kind: "teacher" }).reflections[0]?.author).toBe("Ana");
+    expect(
+      view({ kind: "player", cityId: "green", playerId: "p-ana", name: "Ana" })
+        .reflections,
+    ).toHaveLength(1);
+    expect(
+      view({ kind: "player", cityId: "blue", playerId: "p-bo", name: "Bo" })
+        .reflections,
+    ).toHaveLength(0);
+    expect(view({ kind: "projector" }).reflections).toHaveLength(0);
+    expect(
+      view({
+        kind: "player",
+        cityId: "green",
+        playerId: "p-ana",
+        name: "Ana",
+      }).team?.map((p) => p.name),
+    ).toEqual(["Ana"]);
+  });
+});
