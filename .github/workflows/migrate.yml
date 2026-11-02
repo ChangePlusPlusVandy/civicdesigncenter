@@ -1,0 +1,37 @@
+name: Migrate (Neon)
+
+# Applies database migrations to Neon after CI passes on main, using the
+# direct (non-pooled) connection in the DATABASE_URL_DIRECT secret.
+# Until the Drizzle database layer lands (#8/#11) apps/server has no
+# db:migrate script, so `--if-present` makes this a no-op.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: { group: migrate-neon, cancel-in-progress: false }
+
+permissions: { contents: read }
+
+jobs:
+  migrate:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run --if-present -w apps/server db:migrate
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
