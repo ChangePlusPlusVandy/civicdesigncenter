@@ -2,13 +2,13 @@ import { useContext, useRef, useState, type ReactNode } from "react";
 import { Billboard } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import type { Group } from "three";
-import { BUILDINGS, cityInfo, type PublicCity } from "@cs/idle";
+import { BUILDINGS, type PublicCity } from "@cs/idle";
 import { BuildingModel } from "./Buildings";
 import { Ball, Box } from "./parts";
-import { MotionContext, hash, toWorld } from "./scene";
+import { MapContext, MotionContext, hash, toWorld } from "./scene";
 
 function Fence({ city }: { city: PublicCity }) {
-  const { plot } = cityInfo(city.id);
+  const { plot } = useContext(MapContext).cityInfo(city.id);
   const [x0, z0] = toWorld(plot.x, plot.y);
   const left = x0 - 0.5;
   const top = z0 - 0.5;
@@ -55,7 +55,7 @@ function Fence({ city }: { city: PublicCity }) {
 function Walkers({ city }: { city: PublicCity }) {
   const animate = useContext(MotionContext);
   const walkers = useRef<(Group | null)[]>([]);
-  const { plot } = cityInfo(city.id);
+  const { plot } = useContext(MapContext).cityInfo(city.id);
   const count = Math.min(Math.max(Math.round(city.population / 2), 1), 10);
   const [x0, z0] = toWorld(plot.x, plot.y);
   const inset = 0.12;
@@ -118,7 +118,7 @@ function Walkers({ city }: { city: PublicCity }) {
 function Smog({ city }: { city: PublicCity }) {
   const animate = useContext(MotionContext);
   const puffs = useRef<(Group | null)[]>([]);
-  const { plot } = cityInfo(city.id);
+  const { plot } = useContext(MapContext).cityInfo(city.id);
   const [x0, z0] = toWorld(plot.x, plot.y);
   const strength = Math.min((city.pollution - 8) / 20, 1);
   const count = Math.round(4 + strength * 6);

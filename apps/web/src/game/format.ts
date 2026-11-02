@@ -1,14 +1,13 @@
 import {
   BUILDINGS,
-  COMMONS_NAMES,
   EVENTS,
   GOALS,
   GOOD_INFO,
   POLICIES,
-  cityInfo,
   type BuildingKind,
   type CityId,
   type CommonsId,
+  type GameMap,
   type EventKind,
   type GoalId,
   type Good,
@@ -45,6 +44,7 @@ export interface Toast {
 // Plain-language messages for the game events a student should notice.
 export function describeEvent(
   event: LoggedEvent,
+  map: GameMap,
 ): { text: string; tone: Toast["tone"] } | null {
   const payload = event.payload as Record<string, unknown>;
   switch (event.type) {
@@ -55,12 +55,12 @@ export function describeEvent(
       };
     case "commons.collapsed":
       return {
-        text: `⚠️ ${COMMONS_NAMES[payload.commons as CommonsId]} is used up! Nothing can be taken until it grows back.`,
+        text: `⚠️ ${map.commonsNames[payload.commons as CommonsId]} is used up! Nothing can be taken until it grows back.`,
         tone: "bad",
       };
     case "commons.recovered":
       return {
-        text: `🌱 ${COMMONS_NAMES[payload.commons as CommonsId]} is growing back.`,
+        text: `🌱 ${map.commonsNames[payload.commons as CommonsId]} is growing back.`,
         tone: "good",
       };
     case "policy.passed":
@@ -91,7 +91,10 @@ function withArticle(name: string): string {
 }
 
 // What a teammate did, for the team feed: "built a Farm".
-export function describeAction(event: LoggedEvent): string | null {
+export function describeAction(
+  event: LoggedEvent,
+  map: GameMap,
+): string | null {
   const payload = event.payload;
   const building = (kind: BuildingKind) => BUILDINGS[kind].name;
   switch (event.type) {
@@ -108,9 +111,9 @@ export function describeAction(event: LoggedEvent): string | null {
     case "market.sold":
       return `sold ${String(payload.amount)} ${GOOD_INFO[payload.good as Good].name.toLowerCase()}`;
     case "trade.proposed":
-      return `offered a trade to ${cityInfo((payload.offer as { to: CityId }).to).name}`;
+      return `offered a trade to ${map.cityInfo((payload.offer as { to: CityId }).to).name}`;
     case "trade.accepted":
-      return `accepted a trade from ${cityInfo((payload.offer as { from: CityId }).from).name}`;
+      return `accepted a trade from ${map.cityInfo((payload.offer as { from: CityId }).from).name}`;
     case "trade.declined":
       return "said no to a trade";
     case "meeting.voted":

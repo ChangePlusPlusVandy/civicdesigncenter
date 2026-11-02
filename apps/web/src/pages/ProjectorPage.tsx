@@ -49,6 +49,7 @@ export function ProjectorPage() {
           <Suspense fallback={null}>
             <WorldCanvas
               mode="interactive"
+              mapId={state.mapId}
               cities={state.cities}
               commons={state.commons}
               tick={state.tick}

@@ -4,11 +4,10 @@
 import {
   BUILDINGS,
   canAfford,
-  citiesBordering,
-  cityInfo,
+  getMap,
   placementProblem,
-  plotTiles,
   type BuildableKind,
+  type GameMap,
   type PrivateCity,
   type Projection,
 } from "@cs/idle";
@@ -28,10 +27,15 @@ function has(city: PrivateCity, kind: BuildableKind): boolean {
   return city.buildings.some((b) => b.kind === kind);
 }
 
-function canPlaceSomewhere(city: PrivateCity, kind: BuildableKind): boolean {
-  return plotTiles(cityInfo(city.id)).some(
+function canPlaceSomewhere(
+  map: GameMap,
+  city: PrivateCity,
+  kind: BuildableKind,
+): boolean {
+  return map.plotTiles(map.cityInfo(city.id)).some(
     ({ x, y }) =>
       placementProblem(
+        map,
         {
           ...city,
           coins: Infinity,
@@ -49,12 +53,13 @@ function build(kind: BuildableKind): Tip["action"] {
 }
 
 export function advise(game: Projection, city: PrivateCity): Tip[] {
+  const map = getMap(game.mapId);
   const tips: Tip[] = [];
   const bordersWoods =
-    citiesBordering("westWoods").includes(city.id) ||
-    citiesBordering("eastWoods").includes(city.id);
+    map.citiesBordering("westWoods").includes(city.id) ||
+    map.citiesBordering("eastWoods").includes(city.id);
   const borderingCollapsed = game.commons.filter(
-    (c) => c.collapsed && citiesBordering(c.id).includes(city.id),
+    (c) => c.collapsed && map.citiesBordering(c.id).includes(city.id),
   );
   const daysOfFood =
     city.income.food < 0 ? city.goods.food / -city.income.food : Infinity;
@@ -137,7 +142,7 @@ export function advise(game: Projection, city: PrivateCity): Tip[] {
   }
   if (!has(city, "lumber-camp")) {
     tips.push(
-      bordersWoods && canPlaceSomewhere(city, "lumber-camp")
+      bordersWoods && canPlaceSomewhere(map, city, "lumber-camp")
         ? {
             id: "wood",
             tone: "idea",

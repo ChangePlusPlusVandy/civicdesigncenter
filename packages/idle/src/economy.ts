@@ -18,15 +18,7 @@ import {
   type Bundle,
   type Good,
 } from "./content.ts";
-import {
-  citiesBordering,
-  cityAt,
-  cityInfo,
-  neighborOfKind,
-  neighbors,
-  tileAt,
-  type CommonsId,
-} from "./map.ts";
+import { getMap, type CommonsId, type GameMap } from "./map.ts";
 import type { Building, CityState, IdleState, RuleError } from "./types.ts";
 
 export function round3(value: number): number {
@@ -107,16 +99,20 @@ export function bundleIsEmpty(bundle: Bundle): boolean {
   return Object.values(bundle).every((amount) => !amount);
 }
 
-// The commons a building draws from or pollutes: the first neighboring tile
-// that belongs to one.
-export function commonsNextTo(x: number, y: number): CommonsId | undefined {
-  return neighbors(x, y).find((tile) => tile.commons)?.commons;
+// The map a game is played on.
+export function mapOf(state: Pick<IdleState, "mapId">): GameMap {
+  return getMap(state.mapId);
 }
 
 // Whether a building of this kind would get its terrain bonus at (x, y).
-export function hasBonusAt(kind: BuildingKind, x: number, y: number): boolean {
+export function hasBonusAt(
+  map: GameMap,
+  kind: BuildingKind,
+  x: number,
+  y: number,
+): boolean {
   const near = BUILDINGS[kind].bonus?.near;
-  return near ? neighborOfKind(x, y, near) !== undefined : false;
+  return near ? map.neighborOfKind(x, y, near) !== undefined : false;
 }
 
 export interface Rates {
@@ -133,7 +129,8 @@ export function buildingRates(state: IdleState, building: Building): Rates {
   const def = BUILDINGS[building.kind];
   const outputScale = level(LEVEL_OUTPUT, building.level);
   const pollutionScale = level(LEVEL_POLLUTION, building.level);
-  const bonusActive = hasBonusAt(building.kind, building.x, building.y);
+  const map = mapOf(state);
+  const bonusActive = hasBonusAt(map, building.kind, building.x, building.y);
 
   let outputFactor = outputScale;
   let pollutionFactor = pollutionScale;
@@ -186,11 +183,13 @@ export function buildingRates(state: IdleState, building: Building): Rates {
 
   let takes: Rates["takes"];
   if (def.takes) {
-    const commons = neighbors(building.x, building.y).find(
-      (tile) =>
-        tile.commons &&
-        COMMONS[tile.commons].stocks[def.takes?.stock ?? ""] !== undefined,
-    )?.commons;
+    const commons = map
+      .neighbors(building.x, building.y)
+      .find(
+        (tile) =>
+          tile.commons &&
+          COMMONS[tile.commons].stocks[def.takes?.stock ?? ""] !== undefined,
+      )?.commons;
     if (commons) {
       takes = {
         commons,
@@ -249,6 +248,7 @@ export interface Factor {
 
 // Happiness is a visible list of reasons, never a hidden formula.
 export function happinessFactors(state: IdleState, city: CityState): Factor[] {
+  const map = mapOf(state);
   const factors: Factor[] = [{ label: "Base", value: 50 }];
 
   if (city.goods.food < 1) {
@@ -279,11 +279,10 @@ export function happinessFactors(state: IdleState, city: CityState): Factor[] {
   for (const commons of ["river", "westWoods", "eastWoods"] as const) {
     if (
       state.commons[commons].collapsed &&
-      citiesBordering(commons).includes(city.id)
+      map.citiesBordering(commons).includes(city.id)
     ) {
       factors.push({
-        label:
-          commons === "river" ? "The river is dying" : "The woods are gone",
+        label: `${map.commonsNames[commons]} is used up`,
         value: -10,
       });
     }
@@ -344,16 +343,17 @@ export type BuildingCity = Pick<
 >;
 
 export function placementProblem(
+  map: GameMap,
   city: BuildingCity,
   kind: BuildableKind,
   x: number,
   y: number,
 ): RuleError | null {
   const def = BUILDINGS[kind];
-  if (!tileAt(x, y))
+  if (!map.tileAt(x, y))
     return { code: "BAD_REQUEST", message: "That's off the map." };
 
-  const owner = cityAt(x, y);
+  const owner = map.cityAt(x, y);
   if (!owner) {
     return {
       code: "NOT_YOUR_LAND",
@@ -363,13 +363,13 @@ export function placementProblem(
   if (owner.id !== city.id) {
     return {
       code: "NOT_YOUR_LAND",
-      message: `That land belongs to ${cityInfo(owner.id).name}.`,
+      message: `That land belongs to ${owner.name}.`,
     };
   }
   if (city.buildings.some((building) => building.x === x && building.y === y)) {
     return { code: "OCCUPIED", message: "Something is already built there." };
   }
-  if (def.needs && !neighborOfKind(x, y, def.needs)) {
+  if (def.needs && !map.neighborOfKind(x, y, def.needs)) {
     const place = def.needs === "water" ? "the river" : "woods";
     return {
       code: "NEEDS_NEIGHBOR",

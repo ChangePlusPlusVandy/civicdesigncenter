@@ -8,7 +8,7 @@ import type {
   PolicyId,
   Speed,
 } from "./content.ts";
-import type { CityId, CommonsId } from "./map.ts";
+import type { CityId, CommonsId, MapId } from "./map.ts";
 
 export type Phase = "lobby" | "running" | "paused" | "meeting" | "ended";
 
@@ -111,6 +111,7 @@ export interface ActiveEvent {
 }
 
 export interface IdleState {
+  mapId: MapId;
   tick: number;
   season: number;
   phase: Phase;

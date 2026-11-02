@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import {
-  COMMONS_NAMES,
   GOALS,
+  getMap,
   POLICIES,
   REFLECTION_MAX_LENGTH,
   REFLECTION_PROMPTS,
@@ -71,7 +71,7 @@ function TeamSection({
       (e) =>
         e.outcome === "accepted" && e.actorName && e.city === game.me?.cityId,
     )
-    .map((e) => ({ event: e, text: describeAction(e) }))
+    .map((e) => ({ event: e, text: describeAction(e, getMap(game.mapId)) }))
     .filter(
       (row): row is { event: LoggedEvent; text: string } => row.text !== null,
     )
@@ -582,7 +582,7 @@ export function SeasonReportModal({
           {(Object.keys(report.commons) as CommonsId[]).map((id) => (
             <Change
               key={id}
-              label={`${COMMONS_NAMES[id]} %`}
+              label={`${getMap(game.mapId).commonsNames[id]} %`}
               before={report.commons[id].before}
               after={report.commons[id].after}
             />

@@ -8,6 +8,7 @@ import express, { type Router } from "express";
 import { Server as SocketServer, type Socket } from "socket.io";
 import {
   CLIENT_EVENTS,
+  MAP_IDS,
   SANDBOX_NAMESPACE,
   SERVER_EVENTS,
   type Ack,
@@ -17,6 +18,7 @@ import {
   type GameInfoResponse,
   type JoinResponse,
   type LoggedEvent,
+  type MapId,
 } from "@cs/idle";
 import { normalizeRoomCode } from "@cs/shared";
 import { GameRoom, type Identity } from "./room.ts";
@@ -39,7 +41,7 @@ export class Sandbox {
 
   constructor(private readonly options: SandboxOptions = {}) {}
 
-  create(cityCount?: number): GameRoom {
+  create(cityCount?: number, mapId?: MapId): GameRoom {
     this.sweep();
     let code = "";
     do {
@@ -50,6 +52,7 @@ export class Sandbox {
     } while (this.rooms.has(code));
     const room = new GameRoom(code, {
       cityCount,
+      mapId,
       tickMs: this.options.tickMs,
       onChange: (changed, events) => this.broadcast(changed, events),
     });
@@ -91,7 +94,12 @@ export class Sandbox {
           .json({ error: "BAD_REQUEST", message: "Pick 2 to 5 cities." });
         return;
       }
-      const room = this.create(cityCount);
+      const mapId = req.body?.mapId ?? "classic";
+      if (!MAP_IDS.includes(mapId)) {
+        res.status(400).json({ error: "BAD_REQUEST", message: "Pick a map." });
+        return;
+      }
+      const room = this.create(cityCount, mapId);
       const body: CreateGameResponse = {
         code: room.code,
         teacherToken: room.teacherToken,
@@ -109,6 +117,7 @@ export class Sandbox {
       }
       const body: GameInfoResponse = {
         code: room.code,
+        mapId: room.state.mapId,
         phase: room.state.phase,
         cities: room.state.cityIds,
       };

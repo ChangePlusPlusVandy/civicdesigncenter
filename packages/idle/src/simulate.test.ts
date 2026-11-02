@@ -6,11 +6,12 @@ import { describe, expect, it } from "vitest";
 import { BUILDABLE, GOODS, type BuildableKind } from "./content.ts";
 import {
   housing,
+  mapOf,
   placementProblem,
   upgradeCost,
   canAfford,
 } from "./economy.ts";
-import { cityInfo, plotTiles, type CityId } from "./map.ts";
+import { MAP_IDS, type CityId, type MapId } from "./map.ts";
 import { createGame, reduce } from "./rules.ts";
 import type { CityState, IdleState, Intent } from "./types.ts";
 
@@ -25,9 +26,10 @@ function buildAnywhere(
   city: CityState,
   kind: BuildableKind,
 ): Intent | null {
-  const tile = plotTiles(cityInfo(city.id)).find(
-    ({ x, y }) => placementProblem(city, kind, x, y) === null,
-  );
+  const map = mapOf(state);
+  const tile = map
+    .plotTiles(map.cityInfo(city.id))
+    .find(({ x, y }) => placementProblem(map, city, kind, x, y) === null);
   return tile
     ? { type: "build", payload: { kind, x: tile.x, y: tile.y } }
     : null;
@@ -119,8 +121,8 @@ const greedy: Strategy = (state, city) => {
   ]);
 };
 
-function play(strategy: Strategy, ticks: number) {
-  let state = createGame(5);
+function play(strategy: Strategy, ticks: number, mapId: MapId = "classic") {
+  let state = createGame(5, mapId);
   const start = reduce(state, { kind: "teacher" }, { type: "start" });
   if (!start.ok) throw new Error(start.error.message);
   state = start.state;
@@ -174,16 +176,17 @@ function score(state: IdleState): number {
   }, 0);
 }
 
-describe("simulation", () => {
+describe.each(MAP_IDS)("simulation on the %s map", (mapId) => {
   it("replays exactly from the same actions", () => {
-    const a = play(sustainable, 120);
-    const b = play(sustainable, 120);
+    const a = play(sustainable, 120, mapId);
+    const b = play(sustainable, 120, mapId);
     expect(b.state).toEqual(a.state);
     expect(b.log).toEqual(a.log);
   });
 
   it("has a legal spot for every building kind on the starting map", () => {
-    const start = createGame(5);
+    const start = createGame(5, mapId);
+    const map = mapOf(start);
     for (const kind of BUILDABLE) {
       const somewhere = start.cityIds.some((id) => {
         const city = start.cities[id] as CityState;
@@ -198,18 +201,26 @@ describe("simulation", () => {
             },
           },
         };
-        return plotTiles(cityInfo(id)).some(
-          ({ x, y }) =>
-            placementProblem(rich.cities[id] as CityState, kind, x, y) === null,
-        );
+        return map
+          .plotTiles(map.cityInfo(id))
+          .some(
+            ({ x, y }) =>
+              placementProblem(
+                map,
+                rich.cities[id] as CityState,
+                kind,
+                x,
+                y,
+              ) === null,
+          );
       });
       expect(somewhere, kind).toBe(true);
     }
   });
 
   it("grabbing everything empties the river; sharing it wins over a full game", () => {
-    const greedyGame = play(greedy, 450);
-    const sharedGame = play(sustainable, 450);
+    const greedyGame = play(greedy, 450, mapId);
+    const sharedGame = play(sustainable, 450, mapId);
 
     expect(greedyGame.riverCollapsed).toBe(true);
     expect(sharedGame.riverCollapsed).toBe(false);

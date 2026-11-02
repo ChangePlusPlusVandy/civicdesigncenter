@@ -4,7 +4,8 @@ import { buildDemoWorld } from "./demoWorld";
 import { WebGLBoundary } from "./WebGLBoundary";
 import { WorldCanvas } from "./WorldCanvas";
 
-const DEMO = buildDemoWorld();
+// Nashville is the first city this game is built for.
+const DEMO = buildDemoWorld("nashville");
 
 export function WorldBackdrop({ className }: { className?: string }) {
   const [ready, setReady] = useState(false);
@@ -21,6 +22,7 @@ export function WorldBackdrop({ className }: { className?: string }) {
       >
         <WorldCanvas
           mode="backdrop"
+          mapId={DEMO.mapId}
           cities={DEMO.cities}
           commons={DEMO.commons}
           tick={DEMO.tick}

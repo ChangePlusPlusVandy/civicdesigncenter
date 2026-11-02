@@ -3,6 +3,8 @@ import { ExternalLink, LoaderCircle, Pause, Play, Square } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   EVENTS,
+  MAP_IDS,
+  getMap,
   GOODS,
   GOOD_INFO,
   POLICIES,
@@ -10,6 +12,7 @@ import {
   type CityId,
   type ClientIntent,
   type EventKind,
+  type MapId,
   type PolicyId,
   type Projection,
 } from "@cs/idle";
@@ -38,6 +41,7 @@ const WorldCanvas = lazy(() =>
 export function TeachHomePage() {
   const navigate = useNavigate();
   const [cities, setCities] = useState(5);
+  const [mapId, setMapId] = useState<MapId>("nashville");
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -46,7 +50,7 @@ export function TeachHomePage() {
     setError("");
     setCreating(true);
     try {
-      const game = await createGame(cities);
+      const game = await createGame(cities, mapId);
       saveSession({
         role: "teacher",
         code: game.code,
@@ -80,6 +84,48 @@ export function TeachHomePage() {
         onSubmit={handleSubmit}
         className={cn(panel, "mt-10 space-y-5 p-6 shadow-sm")}
       >
+        <fieldset>
+          <legend className="text-sm font-semibold">Which map?</legend>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup">
+            {MAP_IDS.map((id) => {
+              const map = getMap(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={mapId === id}
+                  onClick={() => setMapId(id)}
+                  className={cn(
+                    "rounded-lg border p-3 text-left",
+                    mapId === id
+                      ? "border-primary bg-primary/10 ring-1 ring-primary"
+                      : "hover:bg-secondary",
+                  )}
+                >
+                  <span className="font-bold">{map.name}</span>
+                  <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                    {map.blurb}
+                  </span>
+                  <span className="mt-2 flex flex-wrap gap-1">
+                    {map.cities.map((city) => (
+                      <span
+                        key={city.id}
+                        className="flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-[11px] font-semibold"
+                      >
+                        <span
+                          className="size-2 rounded-full"
+                          style={{ background: city.color }}
+                        />
+                        {city.name}
+                      </span>
+                    ))}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
         <fieldset>
           <legend className="text-sm font-semibold">How many cities?</legend>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -426,6 +472,7 @@ function Console({
               <Suspense fallback={null}>
                 <WorldCanvas
                   mode="interactive"
+                  mapId={state.mapId}
                   cities={state.cities}
                   commons={state.commons}
                   tick={state.tick}
@@ -614,7 +661,7 @@ function Console({
                       {event.city
                         ? `${state.cities.find((c) => c.id === event.city)?.name}: `
                         : ""}
-                      {describeEvent(event)?.text ??
+                      {describeEvent(event, getMap(state.mapId))?.text ??
                         event.type.replace(/[._]/g, " ")}
                     </span>
                   </li>

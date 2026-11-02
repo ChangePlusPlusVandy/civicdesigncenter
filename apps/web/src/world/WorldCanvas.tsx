@@ -3,15 +3,30 @@ import { MapControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import type { Vector3 } from "three";
 import {
-  cityInfo,
+  getMap,
   type CityId,
   type CommonsView,
+  type GameMap,
+  type MapId,
   type PublicCity,
   type Tile,
 } from "@cs/idle";
-import { Badge, LabelLayer, LabelTracker, Popup, type Label } from "./Labels";
+import {
+  Badge,
+  LabelLayer,
+  LabelTracker,
+  MapTag,
+  Popup,
+  type Label,
+} from "./Labels";
+import { Landmarks } from "./Landmarks";
 import { TileMarkers, type PlacementCell } from "./Markers";
-import { MotionContext, toWorld, usePrefersReducedMotion } from "./scene";
+import {
+  MapContext,
+  MotionContext,
+  toWorld,
+  usePrefersReducedMotion,
+} from "./scene";
 import { Settlements } from "./Settlements";
 import { Clouds, Terrain, type TileHandlers } from "./Terrain";
 
@@ -68,6 +83,7 @@ function InteractiveCamera({
   quarterTurns: number;
   focus?: CityId;
 }) {
+  const map = useContext(MapContext);
   const animate = useContext(MotionContext);
   const get = useThree((state) => state.get);
   const size = useThree((state) => state.size);
@@ -92,7 +108,7 @@ function InteractiveCamera({
 
     if (focus && !focused.current) {
       focused.current = true;
-      const { plot } = cityInfo(focus);
+      const { plot } = map.cityInfo(focus);
       const [x, z] = toWorld(
         plot.x + (plot.width - 1) / 2,
         plot.y + (plot.height - 1) / 2,
@@ -137,6 +153,46 @@ function InteractiveCamera({
 
 // Badges for every building in the viewer's city, plus a popup for each one
 // that produced something on the last tick (re-keyed by tick to replay).
+// Names floating over each city, the river and woods, and landmarks, so
+// students know who they're trading with and what they share.
+function mapLabels(map: GameMap, cities: PublicCity[]): Label[] {
+  const labels: Label[] = cities.map((city) => {
+    const { plot } = map.cityInfo(city.id);
+    const [x, z] = toWorld(plot.x + (plot.width - 1) / 2, plot.y);
+    return {
+      id: `city-${city.id}`,
+      position: [x, 0.1, z - 0.55],
+      node: <MapTag text={city.name} color={city.color} />,
+    };
+  });
+  for (const [id, spot] of Object.entries(map.commonsLabels)) {
+    const [x, z] = toWorld(spot.x, spot.y);
+    labels.push({
+      id: `commons-${id}`,
+      position: [x, 0.3, z],
+      node: (
+        <MapTag
+          text={map.commonsNames[id as keyof GameMap["commonsNames"]]}
+          kind="nature"
+        />
+      ),
+    });
+  }
+  for (const [i, landmark] of map.landmarks.entries()) {
+    if (!landmark.label) continue;
+    const [x, z] = toWorld(
+      landmark.x + (landmark.width - 1) / 2,
+      landmark.y + (landmark.height - 1) / 2,
+    );
+    labels.push({
+      id: `landmark-${i}`,
+      position: [x, 3.6, z],
+      node: <MapTag text={landmark.label} kind="landmark" />,
+    });
+  }
+  return labels;
+}
+
 function cityLabels(
   cities: PublicCity[],
   myCityId: CityId | undefined,
@@ -195,6 +251,7 @@ export interface WorldCanvasProps extends TileHandlers {
   cities: PublicCity[];
   commons: CommonsView[];
   tick: number;
+  mapId: MapId;
   // The viewer's own city: badges and popups, and the camera starts there.
   myCityId?: CityId;
   hovered?: Tile | null;
@@ -206,6 +263,7 @@ export interface WorldCanvasProps extends TileHandlers {
 
 export function WorldCanvas({
   mode,
+  mapId,
   cities,
   commons,
   tick,
@@ -221,9 +279,13 @@ export function WorldCanvas({
   const animate = !usePrefersReducedMotion();
   const interactive = mode === "interactive";
   const labelElements = useRef(new Map<string, HTMLElement>());
+  const map = getMap(mapId);
   const labels = useMemo(
-    () => cityLabels(cities, myCityId, tick, animate),
-    [cities, myCityId, tick, animate],
+    () => [
+      ...(interactive ? mapLabels(map, cities) : []),
+      ...cityLabels(cities, myCityId, tick, animate),
+    ],
+    [map, interactive, cities, myCityId, tick, animate],
   );
 
   return (
@@ -241,31 +303,34 @@ export function WorldCanvas({
         }
         onCreated={() => onReady?.()}
       >
-        <MotionContext.Provider value={animate}>
-          <Lights />
-          {interactive ? (
-            <InteractiveCamera quarterTurns={quarterTurns} focus={myCityId} />
-          ) : (
-            <>
-              <BackdropCamera />
-              <Clouds />
-            </>
-          )}
-          <Terrain
-            commons={commons}
-            onTileHover={interactive ? onTileHover : undefined}
-            onTileClick={interactive ? onTileClick : undefined}
-          />
-          <Settlements cities={cities} />
-          <LabelTracker labels={labels} elements={labelElements} />
-          {interactive ? (
-            <TileMarkers
-              hovered={hovered}
-              selected={selected}
-              placementCells={placementCells}
+        <MapContext.Provider value={map}>
+          <MotionContext.Provider value={animate}>
+            <Lights />
+            {interactive ? (
+              <InteractiveCamera quarterTurns={quarterTurns} focus={myCityId} />
+            ) : (
+              <>
+                <BackdropCamera />
+                <Clouds />
+              </>
+            )}
+            <Terrain
+              commons={commons}
+              onTileHover={interactive ? onTileHover : undefined}
+              onTileClick={interactive ? onTileClick : undefined}
             />
-          ) : null}
-        </MotionContext.Provider>
+            <Landmarks />
+            <Settlements cities={cities} />
+            <LabelTracker labels={labels} elements={labelElements} />
+            {interactive ? (
+              <TileMarkers
+                hovered={hovered}
+                selected={selected}
+                placementCells={placementCells}
+              />
+            ) : null}
+          </MotionContext.Provider>
+        </MapContext.Provider>
       </Canvas>
       <LabelLayer labels={labels} elements={labelElements} />
     </div>

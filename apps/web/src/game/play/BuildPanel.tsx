@@ -7,14 +7,13 @@ import {
   MAX_LEVEL,
   TILE_NAMES,
   canAfford,
-  cityAt,
-  cityInfo,
+  getMap,
   hasBonusAt,
   placementProblem,
-  plotTiles,
   upgradeCost,
   type BuildableKind,
   type Building,
+  type GameMap,
   type ClientIntent,
   type Good,
   type PrivateCity,
@@ -34,6 +33,7 @@ const TILE_INFO: Record<Tile["kind"], string> = {
   water:
     "Fish live in the river. Fishing docks must touch it. Pollution from the cities on its banks makes it murky.",
   clay: "A clay deposit. A clay pit next to it digs more clay and pollutes less.",
+  downtown: "Downtown: offices, shops and music halls. Nobody can build here.",
   copper:
     "A copper deposit. A copper mine next to it makes more copper and pollutes less.",
 };
@@ -48,15 +48,17 @@ const STATUS_TEXT: Record<Building["status"], string> = {
 // The player's plot as a grid of buttons: another way to place a building
 // that works with a keyboard or screen reader, next to tapping the 3D map.
 export function SpotPicker({
+  map,
   city,
   kind,
   onPlace,
 }: {
+  map: GameMap;
   city: PrivateCity;
   kind: BuildableKind;
   onPlace: (tile: Tile) => void;
 }) {
-  const { plot } = cityInfo(city.id);
+  const { plot } = map.cityInfo(city.id);
   return (
     <div className="mb-3 rounded-lg border border-primary/40 bg-primary/5 p-2.5">
       <p className="text-sm font-semibold">
@@ -69,11 +71,11 @@ export function SpotPicker({
         className="mx-auto mt-2 grid w-fit gap-1"
         style={{ gridTemplateColumns: `repeat(${plot.width}, 2.5rem)` }}
       >
-        {plotTiles(cityInfo(city.id)).map((tile) => {
+        {map.plotTiles(map.cityInfo(city.id)).map((tile) => {
           const building = city.buildings.find(
             (b) => b.x === tile.x && b.y === tile.y,
           );
-          const problem = placementProblem(city, kind, tile.x, tile.y);
+          const problem = placementProblem(map, city, kind, tile.x, tile.y);
           const row = tile.y - plot.y + 1;
           const column = tile.x - plot.x + 1;
           return (
@@ -86,7 +88,7 @@ export function SpotPicker({
               aria-label={
                 problem
                   ? `Row ${row}, column ${column}: ${problem.message}`
-                  : `Build here: row ${row}, column ${column}${hasBonusAt(kind, tile.x, tile.y) ? ", with a bonus" : ""}`
+                  : `Build here: row ${row}, column ${column}${hasBonusAt(map, kind, tile.x, tile.y) ? ", with a bonus" : ""}`
               }
               className={cn(
                 "grid size-10 place-items-center rounded-md text-base",
@@ -97,7 +99,7 @@ export function SpotPicker({
             >
               {building
                 ? BUILDINGS[building.kind].icon
-                : !problem && hasBonusAt(kind, tile.x, tile.y)
+                : !problem && hasBonusAt(map, kind, tile.x, tile.y)
                   ? "✨"
                   : ""}
             </button>
@@ -184,7 +186,8 @@ export function TileDetails({
   onClose: () => void;
 }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const owner = cityAt(tile.x, tile.y);
+  const map = getMap(game.mapId);
+  const owner = map.cityAt(tile.x, tile.y);
   const ownerCity = owner
     ? game.cities.find((c) => c.id === owner.id)
     : undefined;
@@ -202,7 +205,7 @@ export function TileDetails({
   else if (mine) title = "Your land";
 
   const bonusOn = building
-    ? hasBonusAt(building.kind, building.x, building.y)
+    ? hasBonusAt(map, building.kind, building.x, building.y)
     : false;
   const next =
     building && building.kind !== "hall" && building.level < MAX_LEVEL

@@ -13,6 +13,7 @@ import {
   type GameEvent,
   type IdleState,
   type LoggedEvent,
+  type MapId,
   type Projection,
   type RosterEntry,
 } from "@cs/idle";
@@ -31,6 +32,7 @@ export type Identity =
 
 export interface RoomOptions {
   cityCount?: number;
+  mapId?: MapId;
   // Milliseconds per tick at speed ×1. 0 turns the timer off (tests tick by hand).
   tickMs?: number;
   onChange?: (room: GameRoom, events: LoggedEvent[]) => void;
@@ -82,7 +84,7 @@ export class GameRoom {
     readonly code: string,
     options: RoomOptions = {},
   ) {
-    this.state = createGame(options.cityCount ?? 5);
+    this.state = createGame(options.cityCount ?? 5, options.mapId);
     this.tickMs = options.tickMs ?? TICK_MS;
     this.onChange = options.onChange;
   }

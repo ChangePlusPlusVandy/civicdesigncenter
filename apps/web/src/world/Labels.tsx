@@ -63,6 +63,39 @@ export function Popup({ building }: { building: Building }) {
   );
 }
 
+// A name floating over the map: a city, the river or woods, or a landmark.
+export function MapTag({
+  text,
+  color,
+  kind = "city",
+}: {
+  text: string;
+  color?: string;
+  kind?: "city" | "nature" | "landmark";
+}) {
+  if (kind === "nature") {
+    return (
+      <span className="whitespace-nowrap text-xs font-semibold italic text-white [text-shadow:0_1px_2px_rgb(0_0_0/55%)]">
+        {text}
+      </span>
+    );
+  }
+  return (
+    <span
+      className={
+        kind === "landmark"
+          ? "whitespace-nowrap rounded-full bg-foreground/80 px-2 py-0.5 text-xs font-bold text-background shadow"
+          : "flex items-center gap-1 whitespace-nowrap rounded-full bg-white/85 px-2 py-0.5 text-xs font-bold text-foreground shadow"
+      }
+    >
+      {color ? (
+        <span className="size-2 rounded-full" style={{ background: color }} />
+      ) : null}
+      {text}
+    </span>
+  );
+}
+
 const projected = new Vector3();
 
 // Inside the canvas: moves each label element to its point on screen.

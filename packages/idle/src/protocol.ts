@@ -1,6 +1,6 @@
 // The wire contract between the web client and the sandbox server.
 
-import type { CityId } from "./map.ts";
+import type { CityId, MapId } from "./map.ts";
 import type {
   ErrorCode,
   GameEvent,
@@ -64,6 +64,7 @@ export interface LoggedEvent extends GameEvent {
 // REST, under /api/sandbox.
 export interface CreateGameRequest {
   cityCount?: number;
+  mapId?: MapId;
 }
 export interface CreateGameResponse {
   code: string;
@@ -81,6 +82,7 @@ export interface JoinResponse {
 }
 export interface GameInfoResponse {
   code: string;
+  mapId: MapId;
   phase: string;
   cities: CityId[];
 }

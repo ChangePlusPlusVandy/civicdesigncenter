@@ -4,8 +4,8 @@
 import { useContext, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import type { Group, Mesh } from "three";
-import { tileAt, type Building } from "@cs/idle";
-import { MotionContext } from "./scene";
+import type { Building } from "@cs/idle";
+import { MapContext, MotionContext } from "./scene";
 import { Ball, Box, Cone, Cylinder, Rock, Roof } from "./parts";
 
 type Vec3 = [number, number, number];
@@ -316,9 +316,10 @@ function FishingDock({
   running: boolean;
 }) {
   const animate = useContext(MotionContext);
+  const map = useContext(MapContext);
   const boats = useRef<(Group | null)[]>([]);
   const [dx, dz] = WATER_DIRECTIONS.find(
-    ([ox, oy]) => tileAt(x + ox, y + oy)?.kind === "water",
+    ([ox, oy]) => map.tileAt(x + ox, y + oy)?.kind === "water",
   ) ?? [1, 0];
   const along = dx !== 0;
   const length = 0.5 + level * 0.12;

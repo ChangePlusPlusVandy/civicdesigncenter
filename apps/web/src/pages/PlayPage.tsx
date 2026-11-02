@@ -13,10 +13,9 @@ import {
   BUILDINGS,
   GOODS,
   GOOD_INFO,
-  cityInfo,
+  getMap,
   hasBonusAt,
   placementProblem,
-  plotTiles,
   type BuildableKind,
   type ClientIntent,
   type PrivateCity,
@@ -172,6 +171,7 @@ function PlayView({
   state: Projection;
   city: PrivateCity;
 }) {
+  const map = getMap(state.mapId);
   const { toasts, push } = useToasts();
   const run = useRun(game, push);
   const [tab, setTab] = useState<Tab>("build");
@@ -190,12 +190,12 @@ function PlayView({
     if (lastSeq.current !== null) {
       for (const event of game.events) {
         if (event.seq <= lastSeq.current) continue;
-        const message = describeEvent(event);
+        const message = describeEvent(event, map);
         if (message) push(message.text, message.tone);
       }
     }
     lastSeq.current = newest;
-  }, [game.events, push]);
+  }, [game.events, push, map]);
 
   // Other cities' offers to us don't come as events; spot them in the state.
   const knownOffers = useRef<Set<string> | null>(null);
@@ -240,13 +240,13 @@ function PlayView({
   const placementCells = useMemo<PlacementCell[] | undefined>(
     () =>
       placing
-        ? plotTiles(cityInfo(city.id)).map(({ x, y }) => ({
+        ? map.plotTiles(map.cityInfo(city.id)).map(({ x, y }) => ({
             x,
             y,
-            ok: placementProblem(city, placing, x, y) === null,
+            ok: placementProblem(map, city, placing, x, y) === null,
           }))
         : undefined,
-    [placing, city],
+    [placing, city, map],
   );
 
   async function handleTileClick(tile: Tile) {
@@ -254,7 +254,7 @@ function PlayView({
       setSelected(tile);
       return;
     }
-    const problem = placementProblem(city, placing, tile.x, tile.y);
+    const problem = placementProblem(map, city, placing, tile.x, tile.y);
     if (problem) {
       push(problem.message, "bad");
       return;
@@ -262,7 +262,7 @@ function PlayView({
     const kind = placing;
     const built = await run(
       { type: "build", payload: { kind, x: tile.x, y: tile.y } },
-      hasBonusAt(kind, tile.x, tile.y)
+      hasBonusAt(map, kind, tile.x, tile.y)
         ? `${BUILDINGS[kind].name} built, with a bonus! ✨`
         : `${BUILDINGS[kind].name} built!`,
     );
@@ -274,8 +274,8 @@ function PlayView({
 
   const hint = placing
     ? hovered
-      ? (placementProblem(city, placing, hovered.x, hovered.y)?.message ??
-        (hasBonusAt(placing, hovered.x, hovered.y)
+      ? (placementProblem(map, city, placing, hovered.x, hovered.y)?.message ??
+        (hasBonusAt(map, placing, hovered.x, hovered.y)
           ? `Tap to build here. ${BUILDINGS[placing].bonus?.text}`
           : `Tap to build your ${BUILDINGS[placing].name} here.`))
       : `Tap a green tile to build your ${BUILDINGS[placing].name}. Esc to cancel.`
@@ -317,6 +317,7 @@ function PlayView({
           <Suspense fallback={null}>
             <WorldCanvas
               mode="interactive"
+              mapId={state.mapId}
               cities={state.cities}
               commons={state.commons}
               tick={state.tick}
@@ -509,6 +510,7 @@ function PlayView({
                 <>
                   {placing ? (
                     <SpotPicker
+                      map={map}
                       city={city}
                       kind={placing}
                       onPlace={handleTileClick}

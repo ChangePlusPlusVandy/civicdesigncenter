@@ -28,6 +28,7 @@ import {
   canAfford,
   commonsHealth,
   isBundle,
+  mapOf,
   marketPrice,
   missing,
   placementProblem,
@@ -35,13 +36,7 @@ import {
   upgradeCost,
 } from "./economy.ts";
 import { checkGoals } from "./goals.ts";
-import {
-  CITIES,
-  citiesBordering,
-  cityInfo,
-  type CityId,
-  type CommonsId,
-} from "./map.ts";
+import { getMap, type CityId, type CommonsId, type MapId } from "./map.ts";
 import { runTick } from "./tick.ts";
 import type {
   Actor,
@@ -58,13 +53,14 @@ import type {
   SeasonSnapshot,
 } from "./types.ts";
 
-export function createGame(cityCount = 5): IdleState {
-  const cityIds = CITIES.slice(0, Math.min(Math.max(cityCount, 2), 5)).map(
-    (city) => city.id,
-  );
+export function createGame(cityCount = 5, mapId: MapId = "classic"): IdleState {
+  const map = getMap(mapId);
+  const cityIds = map.cities
+    .slice(0, Math.min(Math.max(cityCount, 2), 5))
+    .map((city) => city.id);
   const cities: IdleState["cities"] = {};
   for (const id of cityIds) {
-    const { hall } = cityInfo(id);
+    const { hall } = map.cityInfo(id);
     const city: CityState = {
       id,
       coins: START.coins,
@@ -106,6 +102,7 @@ export function createGame(cityCount = 5): IdleState {
   }
 
   const state: IdleState = {
+    mapId: map.id,
     tick: 0,
     season: 1,
     phase: "lobby",
@@ -272,7 +269,7 @@ function build(
   ) {
     return fail("BAD_REQUEST", "Pick a building and a tile.");
   }
-  const problem = placementProblem(city, kind, x, y);
+  const problem = placementProblem(mapOf(state), city, kind, x, y);
   if (problem) return { ok: false, error: problem };
 
   const building: Building = {
@@ -512,7 +509,7 @@ function acceptTrade(
   if (!canAfford(giver, offer.give)) {
     return fail(
       "CANT_AFFORD",
-      `${cityInfo(giver.id).name} can't pay that anymore.`,
+      `${mapOf(state).cityInfo(giver.id).name} can't pay that anymore.`,
     );
   }
   if (!canAfford(city, offer.get)) {
@@ -813,7 +810,7 @@ function triggerEvent(
     return fail("WRONG_PHASE", "Events happen while the game is on.");
   }
   if (kind === "flood") {
-    const riverside = citiesBordering("river");
+    const riverside = mapOf(state).citiesBordering("river");
     const cities = { ...state.cities };
     for (const id of riverside) {
       const city = cities[id];

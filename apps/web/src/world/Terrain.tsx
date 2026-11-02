@@ -11,25 +11,17 @@ import {
   COMMONS,
   MAP_HEIGHT,
   MAP_WIDTH,
-  TILES,
-  cityAt,
-  neighborOfKind,
   type CommonsView,
+  type GameMap,
   type Tile,
 } from "@cs/idle";
 import { Ball } from "./parts";
-import { MotionContext, hash, toWorld } from "./scene";
+import { MapContext, MotionContext, hash, toWorld } from "./scene";
 
 export interface TileHandlers {
   onTileHover?: (tile: Tile | null) => void;
   onTileClick?: (tile: Tile) => void;
 }
-
-const LAND = TILES.filter((tile) => tile.kind !== "water");
-const WATER = TILES.filter((tile) => tile.kind === "water");
-const DEPOSITS = TILES.filter(
-  (tile) => tile.kind === "clay" || tile.kind === "copper",
-);
 
 const GROUND = {
   grass: "#8dbb5a",
@@ -37,6 +29,7 @@ const GROUND = {
   clay: "#c48a5c",
   copper: "#9b9479",
   water: "#4aa6cc",
+  downtown: "#b7b2a6",
 };
 const SAND = "#d8c693";
 const CLEAN_WATER = new Color("#4aa6cc");
@@ -57,30 +50,58 @@ interface TreeSpot {
   rank: number;
 }
 
-const TREES: TreeSpot[] = TILES.filter((tile) => tile.kind === "woods").flatMap(
-  ({ x, y, commons }) => {
-    const [cx, cz] = toWorld(x, y);
-    const count = 2 + Math.round(hash(x, y, 1));
-    return Array.from({ length: count }, (_, i) => ({
-      x: cx + (hash(x, y, 2 + i) - 0.5) * 0.6,
-      z: cz + (hash(x, y, 6 + i) - 0.5) * 0.6,
-      scale: 0.75 + hash(x, y, 10 + i) * 0.55,
-      color: TREE_COLORS[Math.floor(hash(x, y, 14 + i) * 4)] ?? "#4c8a3f",
-      commons: commons === "eastWoods" ? "eastWoods" : "westWoods",
-      rank: hash(x, y, 18 + i),
-    }));
-  },
-);
+interface Layout {
+  land: Tile[];
+  water: Tile[];
+  deposits: Tile[];
+  trees: TreeSpot[];
+}
+
+const layouts = new WeakMap<GameMap, Layout>();
+
+// Which tiles go in which instanced mesh, and where the trees stand. Worked
+// out once per map.
+function layoutOf(map: GameMap): Layout {
+  const cached = layouts.get(map);
+  if (cached) return cached;
+  const layout: Layout = {
+    land: map.tiles.filter((tile) => tile.kind !== "water"),
+    water: map.tiles.filter((tile) => tile.kind === "water"),
+    deposits: map.tiles.filter(
+      (tile) => tile.kind === "clay" || tile.kind === "copper",
+    ),
+    trees: treesOf(map),
+  };
+  layouts.set(map, layout);
+  return layout;
+}
+
+function treesOf(map: GameMap): TreeSpot[] {
+  return map.tiles
+    .filter((tile) => tile.kind === "woods")
+    .flatMap(({ x, y, commons }) => {
+      const [cx, cz] = toWorld(x, y);
+      const count = 2 + Math.round(hash(x, y, 1));
+      return Array.from({ length: count }, (_, i) => ({
+        x: cx + (hash(x, y, 2 + i) - 0.5) * 0.6,
+        z: cz + (hash(x, y, 6 + i) - 0.5) * 0.6,
+        scale: 0.75 + hash(x, y, 10 + i) * 0.55,
+        color: TREE_COLORS[Math.floor(hash(x, y, 14 + i) * 4)] ?? "#4c8a3f",
+        commons: commons === "eastWoods" ? "eastWoods" : "westWoods",
+        rank: hash(x, y, 18 + i),
+      }));
+    });
+}
 
 const dummy = new Object3D();
 const scratch = new Color();
 const tint = new Color();
 
-function landColor(tile: Tile): Color {
-  const city = cityAt(tile.x, tile.y);
+function landColor(map: GameMap, tile: Tile): Color {
+  const city = map.cityAt(tile.x, tile.y);
   const base = scratch.set(GROUND[tile.kind]);
   // Grass along the river fades toward a sandy bank.
-  if (tile.kind === "grass" && neighborOfKind(tile.x, tile.y, "water")) {
+  if (tile.kind === "grass" && map.neighborOfKind(tile.x, tile.y, "water")) {
     base.lerp(tint.set(SAND), 0.4);
   }
   if (city) base.lerp(tint.set(city.color), 0.12).offsetHSL(0, -0.05, 0.05);
@@ -129,6 +150,8 @@ function tileEvents(tiles: Tile[], { onTileHover, onTileClick }: TileHandlers) {
 }
 
 function Ground(handlers: TileHandlers) {
+  const map = useContext(MapContext);
+  const LAND = layoutOf(map).land;
   const ref = useRef<InstancedMesh>(null);
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -136,10 +159,10 @@ function Ground(handlers: TileHandlers) {
     LAND.forEach((tile, i) => {
       const [x, z] = toWorld(tile.x, tile.y);
       place(mesh, i, [x, -0.25, z]);
-      mesh.setColorAt(i, landColor(tile));
+      mesh.setColorAt(i, landColor(map, tile));
     });
     finish(mesh);
-  }, []);
+  }, [LAND, map]);
   return (
     <instancedMesh
       ref={ref}
@@ -155,6 +178,7 @@ function Ground(handlers: TileHandlers) {
 
 function Water({ murk, ...handlers }: { murk: number } & TileHandlers) {
   const animate = useContext(MotionContext);
+  const WATER = layoutOf(useContext(MapContext)).water;
   const ref = useRef<InstancedMesh>(null);
   const material = useRef<MeshStandardMaterial>(null);
 
@@ -166,7 +190,7 @@ function Water({ murk, ...handlers }: { murk: number } & TileHandlers) {
       place(mesh, i, [x, -0.3, z]);
     });
     finish(mesh);
-  }, []);
+  }, [WATER]);
 
   useLayoutEffect(() => {
     material.current?.color
@@ -205,6 +229,7 @@ function Trees({
 }: {
   fullness: Record<"westWoods" | "eastWoods", number>;
 }) {
+  const TREES = layoutOf(useContext(MapContext)).trees;
   const trunks = useRef<InstancedMesh>(null);
   const crowns = useRef<InstancedMesh>(null);
   const west = Math.round(fullness.westWoods * 10) / 10;
@@ -229,7 +254,7 @@ function Trees({
     });
     finish(trunkMesh);
     finish(crownMesh);
-  }, [west, east]);
+  }, [west, east, TREES]);
 
   return (
     <group>
@@ -255,6 +280,7 @@ function Trees({
 }
 
 function Rocks() {
+  const DEPOSITS = layoutOf(useContext(MapContext)).deposits;
   const ref = useRef<InstancedMesh>(null);
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -280,7 +306,7 @@ function Rocks() {
       }
     });
     finish(mesh);
-  }, []);
+  }, [DEPOSITS]);
   return (
     <instancedMesh
       ref={ref}

@@ -14,11 +14,12 @@ import {
   happinessFactors,
   housing,
   jobs,
+  mapOf,
   marketPrice,
   regionHealth,
   type Factor,
 } from "./economy.ts";
-import { CITIES, COMMONS_NAMES, type CityId, type CommonsId } from "./map.ts";
+import type { CityId, CommonsId, GameMap, MapId } from "./map.ts";
 import type {
   ActiveEvent,
   Building,
@@ -114,6 +115,7 @@ export interface ReflectionView {
 }
 
 export interface Projection {
+  mapId: MapId;
   version: number;
   audience: Audience["kind"];
   me: { playerId: string; name: string; cityId: CityId } | null;
@@ -142,8 +144,12 @@ export interface Projection {
   leaderboards: Leaderboard[];
 }
 
-function publicCity(city: CityState, players: string[]): PublicCity {
-  const info = CITIES.find((c) => c.id === city.id);
+function publicCity(
+  map: GameMap,
+  city: CityState,
+  players: string[],
+): PublicCity {
+  const info = map.cities.find((c) => c.id === city.id);
   return {
     id: city.id,
     name: info?.name ?? city.id,
@@ -182,7 +188,7 @@ function privateCity(
   }
 
   return {
-    ...publicCity(city, players),
+    ...publicCity(mapOf(state), city, players),
     coins: city.coins,
     goods: city.goods,
     growth: city.growth,
@@ -224,6 +230,7 @@ export function project(
   version: number,
   players: RosterEntry[],
 ): Projection {
+  const map = mapOf(state);
   const playersByCity: Partial<Record<CityId, string[]>> = {};
   for (const player of players) {
     (playersByCity[player.cityId] ??= []).push(player.name);
@@ -232,7 +239,7 @@ export function project(
     .map((id) => state.cities[id])
     .filter((city): city is CityState => city !== undefined);
   const cities = cityStates.map((city) =>
-    publicCity(city, playersByCity[city.id] ?? []),
+    publicCity(map, city, playersByCity[city.id] ?? []),
   );
 
   const mine =
@@ -258,6 +265,7 @@ export function project(
   }
 
   return {
+    mapId: state.mapId,
     version,
     audience: audience.kind,
     me:
@@ -307,7 +315,7 @@ export function project(
             })),
     commons: (Object.keys(state.commons) as CommonsId[]).map((id) => ({
       id,
-      name: COMMONS_NAMES[id],
+      name: map.commonsNames[id],
       stocks: Object.fromEntries(
         Object.entries(state.commons[id].stocks).map(([k, v]) => [
           k,

@@ -26,12 +26,13 @@ import {
 import {
   buildingRates,
   housing,
+  mapOf,
   parkCleaning,
   regionHealth,
   round3,
   targetHappiness,
 } from "./economy.ts";
-import { citiesBordering, type CityId, type CommonsId } from "./map.ts";
+import type { CityId, CommonsId } from "./map.ts";
 import { checkGoals } from "./goals.ts";
 import type {
   Building,
@@ -45,6 +46,7 @@ import type {
 const COMMONS_IDS: CommonsId[] = ["river", "westWoods", "eastWoods"];
 
 export function runTick(state: IdleState): ReduceResult {
+  const map = mapOf(state);
   const events: GameEvent[] = [];
   const commons = Object.fromEntries(
     COMMONS_IDS.map((id) => [
@@ -73,10 +75,9 @@ export function runTick(state: IdleState): ReduceResult {
 
   // Pollution from riverside cities drifts into the river; then it slowly clears.
   const river = commons.river;
-  const drift = citiesBordering("river").reduce(
-    (sum, id) => sum + (cities[id]?.pollution ?? 0) * RIVER_DRIFT,
-    0,
-  );
+  const drift = map
+    .citiesBordering("river")
+    .reduce((sum, id) => sum + (cities[id]?.pollution ?? 0) * RIVER_DRIFT, 0);
   const riverDecay =
     RIVER_DECAY * (state.policies.includes("river-protection") ? 2 : 1);
   river.pollution = round3(
@@ -85,7 +86,9 @@ export function runTick(state: IdleState): ReduceResult {
 
   for (const id of COMMONS_IDS) {
     const current = commons[id];
-    const neighbors = citiesBordering(id).filter((cityId) => cities[cityId]);
+    const neighbors = map
+      .citiesBordering(id)
+      .filter((cityId) => cities[cityId]);
     const avgPollution =
       neighbors.reduce(
         (sum, cityId) => sum + (cities[cityId]?.pollution ?? 0),

@@ -5,7 +5,8 @@
 //   npm run bots -- --code ABCDE --players 20
 //
 // Options: --url (default http://localhost:3000), --code or --create,
-// --players (20), --minutes (2), --speed (1, 2 or 4 with --create).
+// --players (20), --minutes (2), --speed (1, 2 or 4 with --create),
+// --map (classic or nashville, with --create).
 
 import { parseArgs } from "node:util";
 import { io, type Socket } from "socket.io-client";
@@ -15,9 +16,8 @@ import {
   GOODS,
   SANDBOX_NAMESPACE,
   SERVER_EVENTS,
-  cityInfo,
+  getMap,
   placementProblem,
-  plotTiles,
   type Ack,
   type BuildableKind,
   type ClientIntent,
@@ -35,6 +35,7 @@ const { values } = parseArgs({
     players: { type: "string", default: "20" },
     minutes: { type: "string", default: "2" },
     speed: { type: "string", default: "1" },
+    map: { type: "string", default: "classic" },
   },
 });
 
@@ -72,9 +73,10 @@ function decide(
   turn: number,
 ): ClientIntent | null {
   const build = (kind: BuildableKind): ClientIntent | null => {
-    const tile = plotTiles(cityInfo(city.id)).find(
-      ({ x, y }) => placementProblem(city, kind, x, y) === null,
-    );
+    const map = getMap(state.mapId);
+    const tile = map
+      .plotTiles(map.cityInfo(city.id))
+      .find(({ x, y }) => placementProblem(map, city, kind, x, y) === null);
     return tile
       ? { type: "build", payload: { kind, x: tile.x, y: tile.y } }
       : null;
@@ -129,7 +131,10 @@ async function main() {
   let code = values.code?.toUpperCase();
   let teacher: Socket | null = null;
   if (values.create) {
-    const game = await post<CreateGameResponse>("/games", { cityCount: 5 });
+    const game = await post<CreateGameResponse>("/games", {
+      cityCount: 5,
+      mapId: values.map,
+    });
     code = game.code;
     teacher = connect(code, game.teacherToken);
     await new Promise((resolve) => teacher?.once(SERVER_EVENTS.state, resolve));

@@ -1,5 +1,7 @@
 import {
   createGame,
+  getMap,
+  placementProblem,
   project,
   reduce,
   type BuildableKind,
@@ -7,93 +9,73 @@ import {
   type CityState,
   type IdleState,
   type Intent,
+  type MapId,
   type Projection,
 } from "@cs/idle";
 
-type Plan = [BuildableKind, number, number, level?: number][];
-
-// A lived-in mid-game world for the join page, made by playing the real
-// rules: scripted builds, a few upgrades, then 40 ticks.
-const PLANS: Record<CityId, Plan> = {
-  red: [
-    ["farm", 3, 3, 2],
-    ["lumber-camp", 1, 3],
-    ["clay-pit", 3, 4],
-    ["house", 2, 1],
-    ["park", 4, 1],
-  ],
-  green: [
-    ["fishing-dock", 9, 0, 2],
-    ["lumber-camp", 12, 2],
-    ["farm", 10, 3],
-    ["house", 11, 1],
-    ["house", 11, 2],
-  ],
-  pink: [
-    ["hunting-lodge", 13, 6],
-    ["copper-mine", 14, 9],
-    ["house", 14, 7, 2],
-    ["farm", 12, 8],
-  ],
-  blue: [
-    ["copper-mine", 15, 12, 2],
-    ["fishing-dock", 12, 13],
-    ["farm", 12, 14],
-    ["house", 13, 14],
-    ["park", 15, 15],
-  ],
-  yellow: [
-    ["fishing-dock", 5, 12],
-    ["lumber-camp", 2, 14],
-    ["farm", 5, 13],
-    ["house", 4, 13, 3],
-  ],
-};
+// What a busy mid-game city has built, in order. Kinds a city can't place
+// (no river or woods next to it) are skipped.
+const PLAN: BuildableKind[] = [
+  "farm",
+  "house",
+  "lumber-camp",
+  "fishing-dock",
+  "house",
+  "clay-pit",
+  "park",
+  "copper-mine",
+  "hunting-lodge",
+  "house",
+];
 
 function step(
   state: IdleState,
   cityId: CityId | null,
   intent: Intent,
 ): IdleState {
-  const actor = cityId
-    ? { kind: "player" as const, cityId }
-    : { kind: "teacher" as const };
-  const result = reduce(
-    state,
-    intent.type === "tick" ? { kind: "system" } : actor,
-    intent,
-  );
+  const actor =
+    intent.type === "tick"
+      ? { kind: "system" as const }
+      : cityId
+        ? { kind: "player" as const, cityId }
+        : { kind: "teacher" as const };
+  const result = reduce(state, actor, intent);
   return result.ok ? result.state : state;
 }
 
-export function buildDemoWorld(): Pick<
-  Projection,
-  "cities" | "commons" | "tick"
-> {
-  let state = step(createGame(5), null, { type: "start" });
-  for (const id of state.cityIds) {
-    const city = state.cities[id] as CityState;
-    state = {
-      ...state,
-      cities: {
-        ...state.cities,
-        [id]: {
-          ...city,
-          coins: 999,
-          population: 9,
-          goods: { food: 99, wood: 99, clay: 99, copper: 99 },
-        },
-      },
+// A lived-in world for the join page, made by playing the real rules:
+// each city builds a typical set of buildings, upgrades a few, then 40 days
+// pass.
+export function buildDemoWorld(
+  mapId: MapId,
+): Pick<Projection, "cities" | "commons" | "tick" | "mapId"> {
+  const map = getMap(mapId);
+  let state = step(createGame(5, mapId), null, { type: "start" });
+  for (const [index, id] of state.cityIds.entries()) {
+    const rich: CityState = {
+      ...(state.cities[id] as CityState),
+      coins: 999,
+      population: 9,
+      goods: { food: 99, wood: 99, clay: 99, copper: 99 },
     };
-    for (const [kind, x, y, level = 1] of PLANS[id]) {
-      state = step(state, id, { type: "build", payload: { kind, x, y } });
-      const built = (state.cities[id] as CityState).buildings.at(-1);
-      for (let l = 1; l < level && built; l++) {
+    state = { ...state, cities: { ...state.cities, [id]: rich } };
+    for (const kind of PLAN.slice(0, 6 + index)) {
+      const city = state.cities[id] as CityState;
+      const tile = map
+        .plotTiles(map.cityInfo(id))
+        .find(({ x, y }) => placementProblem(map, city, kind, x, y) === null);
+      if (tile)
         state = step(state, id, {
-          type: "upgrade",
-          payload: { buildingId: built.id },
+          type: "build",
+          payload: { kind, x: tile.x, y: tile.y },
         });
-      }
+    }
+    const city = state.cities[id] as CityState;
+    for (const building of city.buildings.slice(1, 3)) {
+      state = step(state, id, {
+        type: "upgrade",
+        payload: { buildingId: building.id },
+      });
     }
   }
   for (let t = 0; t < 40; t++) state = step(state, null, { type: "tick" });
@@ -103,5 +85,5 @@ export function buildDemoWorld(): Pick<
     1,
     [],
   );
-  return { cities, commons, tick };
+  return { cities, commons, tick, mapId };
 }

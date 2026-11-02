@@ -3,6 +3,7 @@ import type {
   CreateGameResponse,
   GameInfoResponse,
   JoinResponse,
+  MapId,
 } from "@cs/idle";
 
 // Blank locally and when the server serves the client (same origin).
@@ -41,10 +42,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function createGame(cityCount: number): Promise<CreateGameResponse> {
+export function createGame(
+  cityCount: number,
+  mapId: MapId = "nashville",
+): Promise<CreateGameResponse> {
   return request("/games", {
     method: "POST",
-    body: JSON.stringify({ cityCount }),
+    body: JSON.stringify({ cityCount, mapId }),
   });
 }
 
