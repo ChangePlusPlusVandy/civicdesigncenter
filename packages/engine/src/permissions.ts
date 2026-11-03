@@ -25,7 +25,7 @@ export const RULES: Record<ActionType, Rule> = {
   },
   giftResource: {
     actor: "player",
-    phases: ["auction", "build"],
+    phases: RUNNING,
     paused: "never",
   },
 };

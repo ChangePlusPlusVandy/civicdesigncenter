@@ -63,8 +63,9 @@ server  auth middleware          -> actor { kind: "player", participantId, cityI
   (`teams.city_key`) and puts `cityId` on the actor; the engine never sees a
   team row.
 - **Stable error codes.** `FORBIDDEN` (the actor's role can't do this),
-  `INVALID_TARGET` (a bad target, such as gifting to yourself), `UNKNOWN_*`,
-  `INVALID_AMOUNT` and `NOT_ENOUGH_RESOURCES`.
+  `WRONG_PHASE` / `GAME_PAUSED` / `NOT_PAUSED` / `GAME_ENDED` (not allowed right
+  now), `INVALID_TARGET` (a bad target, such as gifting to yourself),
+  `UNKNOWN_*`, `INVALID_AMOUNT` and `NOT_ENOUGH_RESOURCES`.
   Codes are written to the event log, so rename them only with a migration.
 
 ## Engine rules

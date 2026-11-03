@@ -61,9 +61,10 @@ function unknownEvent(event: never): never {
 }
 
 function cityOf(state: GameState, id: string): CityState {
-  const city = state.cities[id];
-  if (city === undefined) throw new Error(`event names unknown city "${id}"`);
-  return city;
+  if (!Object.hasOwn(state.cities, id)) {
+    throw new Error(`event names unknown city "${id}"`);
+  }
+  return state.cities[id]!;
 }
 
 function withResource(

@@ -140,7 +140,8 @@ function advanced(
 }
 
 // One-way gift from the player's city to another city, as in LC2: the receiver
-// accepts nothing and there is no fee. Allowed in the auction and build phases.
+// accepts nothing and there is no fee. Allowed in any running phase (auction,
+// build, resolve), but not in the lobby, while paused or after the end.
 function giftResource(
   scenario: Scenario,
   state: GameState,

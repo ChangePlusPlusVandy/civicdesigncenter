@@ -243,13 +243,13 @@ describe("who may do what", () => {
     });
   }
 
-  it("lets players gift only in the auction and build phases", () => {
+  it("lets players gift in every running phase and nowhere else", () => {
     const allowed = phases.filter(
       (phase) =>
         errorCode({ ...playing(), phase }, gift("green", "clay", 1)) ===
         undefined,
     );
-    expect(allowed).toEqual(["auction", "build"]);
+    expect(allowed).toEqual(["auction", "build", "resolve"]);
   });
 
   it("keeps lifecycle actions to the teacher", () => {
