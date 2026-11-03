@@ -13,9 +13,12 @@ export type StatId = (typeof STAT_IDS)[number];
 // The map character for a tile with no nature feature.
 export const EMPTY_TILE = ".";
 
-const Id = z
+// Also used for the ids in client intents, so a junk id such as "__proto__"
+// is rejected at the validation boundary.
+export const IdSchema = z
   .string()
   .regex(/^[a-z][a-z0-9-]*$/, "ids are lowercase kebab-case");
+const Id = IdSchema;
 
 // Whole-number amounts keyed by resource or stat id. Negative values are
 // allowed (a building can lower pollution).
@@ -181,8 +184,21 @@ function checkReferences(s: ScenarioShape, ctx: Ctx): void {
           `no feature has kind "${adj.featureKind}"`,
         );
       }
-      keysIn(adj.draws, featureKeys, [...at, "adjacency", "draws"], issue);
-      keysIn(adj.affects, featureKeys, [...at, "adjacency", "affects"], issue);
+      // Only the stocks the features of that kind actually hold can be drawn
+      // from or changed. Pollution may always be added.
+      const held = new Set<string>();
+      for (const f of s.features) {
+        if (f.kind === adj.featureKind) {
+          for (const key of Object.keys(f.stocks)) held.add(key);
+        }
+      }
+      keysIn(adj.draws, held, [...at, "adjacency", "draws"], issue);
+      keysIn(
+        adj.affects,
+        new Set([...held, "pollution"]),
+        [...at, "adjacency", "affects"],
+        issue,
+      );
       keysIn(
         adj.bonusOutput,
         cityKeys,
@@ -194,7 +210,12 @@ function checkReferences(s: ScenarioShape, ctx: Ctx): void {
 
   s.features.forEach((f, i) => {
     keysIn(f.stocks, featureKeys, ["features", i, "stocks"], issue);
-    keysIn(f.regrowth, featureKeys, ["features", i, "regrowth"], issue);
+    keysIn(
+      f.regrowth,
+      new Set(Object.keys(f.stocks)),
+      ["features", i, "regrowth"],
+      issue,
+    );
   });
 
   checkMap(s, issue);

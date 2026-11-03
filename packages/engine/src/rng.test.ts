@@ -40,8 +40,11 @@ describe("rng", () => {
     expect(take(restored, 5)).toEqual(take(state, 5));
   });
 
-  it("normalizes seeds to uint32 and rejects non-integers", () => {
-    expect(seedRng(-1)).toBe(2 ** 32 - 1);
+  it("accepts only integer seeds in [0, 2^32)", () => {
+    expect(seedRng(0)).toBe(0);
+    expect(seedRng(2 ** 32 - 1)).toBe(2 ** 32 - 1);
+    expect(() => seedRng(-1)).toThrow(RangeError);
+    expect(() => seedRng(2 ** 32)).toThrow(RangeError);
     expect(() => seedRng(1.5)).toThrow(RangeError);
     expect(() => seedRng(Number.NaN)).toThrow(RangeError);
   });

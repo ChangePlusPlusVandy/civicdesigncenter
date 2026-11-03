@@ -7,11 +7,13 @@
 
 export type RngState = number;
 
+// The seed is the state, so a seed outside [0, 2^32) is refused rather than
+// wrapped: the seed a server logs is always the seed the game stores.
 export function seedRng(seed: number): RngState {
-  if (!Number.isSafeInteger(seed)) {
-    throw new RangeError(`seed must be a safe integer, got ${seed}`);
+  if (!Number.isInteger(seed) || seed < 0 || seed >= 2 ** 32) {
+    throw new RangeError(`seed must be an integer in [0, 2^32), got ${seed}`);
   }
-  return seed >>> 0;
+  return seed;
 }
 
 // A uniform integer in [0, 2^32).

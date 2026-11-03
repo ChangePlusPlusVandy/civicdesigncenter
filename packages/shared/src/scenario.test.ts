@@ -87,6 +87,35 @@ describe("ScenarioSchema", () => {
     expect(issues(s)).toMatch(/"gems"/);
   });
 
+  it("rejects draws and affects on stocks the adjacent features do not hold", () => {
+    const s = scenario();
+    const camp = s.buildings.find((b) => b.id === "lumber-camp")!;
+    camp.adjacency!.draws = { fish: 3 };
+    expect(issues(s)).toMatch(/"fish"/);
+
+    const t = scenario();
+    const tcamp = t.buildings.find((b) => b.id === "lumber-camp")!;
+    tcamp.adjacency!.affects = { clay: 1 };
+    expect(issues(t)).toMatch(/"clay"/);
+  });
+
+  it("allows an adjacency to add pollution", () => {
+    const s = scenario();
+    const camp = s.buildings.find((b) => b.id === "lumber-camp")!;
+    camp.adjacency!.affects = { pollution: 1 };
+    expect(issues(s)).toBe("");
+  });
+
+  it("rejects regrowth for a stock the feature does not hold", () => {
+    const s = scenario();
+    const feature = s.features[0]!;
+    const missing = ["lumber", "clay", "copper", "food", "fish"].find(
+      (k) => !(k in feature.stocks),
+    )!;
+    feature.regrowth[missing] = 1.1;
+    expect(issues(s)).toMatch(new RegExp(`"${missing}"`));
+  });
+
   it("rejects a map with the wrong number of rows or columns", () => {
     const s = scenario();
     s.map.tiles.pop();

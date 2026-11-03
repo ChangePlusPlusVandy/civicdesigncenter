@@ -45,7 +45,7 @@ export function authorize(state: GameState, action: Action): RuleError | null {
   }
   if (action.actor.kind !== rule.actor) {
     return {
-      code: "NOT_ALLOWED",
+      code: "FORBIDDEN",
       message: `${action.type} is for ${rule.actor}s`,
     };
   }

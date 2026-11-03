@@ -2,8 +2,7 @@
 // ActionIntentSchema, adds who sent it and when, and hands it to the engine.
 
 import { z } from "zod";
-
-const Id = z.string().min(1);
+import { IdSchema as Id } from "./scenario.ts";
 
 // Players
 

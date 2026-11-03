@@ -255,15 +255,15 @@ describe("who may do what", () => {
   it("keeps lifecycle actions to the teacher", () => {
     const asPlayer = (type: Parameters<typeof lifecycle>[0]) =>
       errorCode(playing(), lifecycle(type, AT, red));
-    expect(asPlayer("advancePhase")).toBe("NOT_ALLOWED");
-    expect(asPlayer("pauseGame")).toBe("NOT_ALLOWED");
-    expect(asPlayer("endGame")).toBe("NOT_ALLOWED");
-    expect(asPlayer("startGame")).toBe("NOT_ALLOWED");
+    expect(asPlayer("advancePhase")).toBe("FORBIDDEN");
+    expect(asPlayer("pauseGame")).toBe("FORBIDDEN");
+    expect(asPlayer("endGame")).toBe("FORBIDDEN");
+    expect(asPlayer("startGame")).toBe("FORBIDDEN");
   });
 
   it("keeps gifts to players", () => {
     expect(errorCode(playing(), gift("green", "clay", 1, teacher))).toBe(
-      "NOT_ALLOWED",
+      "FORBIDDEN",
     );
   });
 

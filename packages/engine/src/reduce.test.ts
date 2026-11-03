@@ -1,16 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { reduce } from "./reduce.ts";
 import { createInitialState } from "./state.ts";
-import {
-  AT,
-  errorCode,
-  gift,
-  playing,
-  red,
-  scenario,
-  teacher,
-} from "./test-helpers.ts";
-import type { Action } from "./types.ts";
+import { AT, errorCode, gift, playing, red, scenario } from "./test-helpers.ts";
+import type { Action, GameState } from "./types.ts";
 
 function deepFreeze<T>(value: T): T {
   if (typeof value === "object" && value !== null) {
@@ -120,15 +112,37 @@ describe("reduce: giftResource", () => {
     expect(errorCode(state, gift("green", "gold", 1))).toBe("UNKNOWN_RESOURCE");
   });
 
+  it("treats inherited object keys as unknown cities, not a crash", () => {
+    const state = playing();
+    for (const key of [
+      "constructor",
+      "toString",
+      "__proto__",
+      "hasOwnProperty",
+    ]) {
+      expect(errorCode(state, gift(key, "clay", 1))).toBe("UNKNOWN_CITY");
+      expect(
+        errorCode(
+          state,
+          gift("green", "clay", 1, {
+            kind: "player",
+            participantId: "p",
+            cityId: key,
+          }),
+        ),
+      ).toBe("UNKNOWN_CITY");
+    }
+  });
+
   it("rejects gifts to yourself and gifts from teachers", () => {
     const state = playing();
-    expect(errorCode(state, gift("red", "clay", 1))).toBe("NOT_ALLOWED");
+    expect(errorCode(state, gift("red", "clay", 1))).toBe("INVALID_TARGET");
     expect(
       errorCode(
         state,
         gift("red", "clay", 1, { kind: "teacher", teacherId: "t1" }),
       ),
-    ).toBe("NOT_ALLOWED");
+    ).toBe("FORBIDDEN");
   });
 });
 
@@ -152,17 +166,29 @@ describe("reduce", () => {
     expect(errorCode(state, gift("green", "clay", 1))).toBe("WRONG_SCENARIO");
   });
 
-  it("is deterministic", () => {
+  it("is deterministic and survives a JSON snapshot between steps", () => {
     const actions = [
       gift("green", "clay", 2),
       gift("blue", "food", 1),
       gift("pink", "clay", 2),
     ];
-    const run = () =>
-      actions.reduce((s, a) => {
-        const r = reduce(scenario, s, a);
-        return r.ok ? r.state : s;
-      }, playing());
-    expect(run()).toEqual(run());
+    const run = (snapshot: boolean) => {
+      let state = playing();
+      for (const action of actions) {
+        const result = reduce(scenario, state, action);
+        if (!result.ok) throw new Error(`rejected: ${result.error.message}`);
+        state = snapshot
+          ? (JSON.parse(JSON.stringify(result.state)) as GameState)
+          : result.state;
+      }
+      return state;
+    };
+    const straight = run(false);
+    expect(run(false)).toEqual(straight);
+    expect(run(true)).toEqual(straight);
+    expect(straight.cities.red!.resources.clay).toBe(0);
+    expect(straight.cities.green!.resources.clay).toBe(6);
+    expect(straight.cities.pink!.resources.clay).toBe(6);
+    expect(straight.cities.blue!.resources.food).toBe(5);
   });
 });

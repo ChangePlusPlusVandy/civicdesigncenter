@@ -36,7 +36,7 @@ The server is authoritative. Clients send intents; only the server changes state
 
 ```
 client  emit("action", { clientActionId, type, payload })
-server  auth middleware          -> actor { player | teacher, gameId, participantId, teamId, role }
+server  auth middleware          -> actor { kind: "player", participantId, cityId } | { kind: "teacher", teacherId }
         per-game mutex           -> one action at a time per game
         zod validation
         can(role, action.type)   -> no? ack({ ok: false, code: 'FORBIDDEN' })
@@ -58,6 +58,14 @@ server  auth middleware          -> actor { player | teacher, gameId, participan
 - **Retries are safe.** `clientActionId` is de-duplicated per participant.
 - **Restarts are safe.** Active games rehydrate from their latest snapshot on
   boot. There is one server instance and no Redis.
+- **Teams are cities to the engine.** The engine works in scenario cities.
+  The auth middleware maps a participant's team to its city
+  (`teams.city_key`) and puts `cityId` on the actor; the engine never sees a
+  team row.
+- **Stable error codes.** `FORBIDDEN` (the actor's role can't do this),
+  `INVALID_TARGET` (a bad target, such as gifting to yourself), `UNKNOWN_*`,
+  `INVALID_AMOUNT` and `NOT_ENOUGH_RESOURCES`.
+  Codes are written to the event log, so rename them only with a migration.
 
 ## Engine rules
 

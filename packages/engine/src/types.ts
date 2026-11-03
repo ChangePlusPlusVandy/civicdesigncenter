@@ -79,11 +79,12 @@ export type GameEvent =
 export type RuleErrorCode =
   | "UNKNOWN_ACTION"
   | "WRONG_SCENARIO"
-  | "NOT_ALLOWED"
   | "WRONG_PHASE"
   | "GAME_PAUSED"
   | "NOT_PAUSED"
   | "GAME_ENDED"
+  | "FORBIDDEN"
+  | "INVALID_TARGET"
   | "UNKNOWN_CITY"
   | "UNKNOWN_RESOURCE"
   | "INVALID_AMOUNT"
