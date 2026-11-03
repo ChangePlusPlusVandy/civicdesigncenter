@@ -1,11 +1,14 @@
 # Civic Design Center - City Settler project
 
-City Settlers is a multiplayer city simulation for youth and classrooms. Small
-teams share a map, place buildings on a grid, bid for them in auctions, trade
-resources, and balance money against pollution, population, and happiness.
+City Settlers is a browser-based, real-time, multiplayer city-planning
+simulation for classrooms. Teams each manage a city on a shared map, acquire
+buildings through sealed-bid auctions, gift resources to other teams, and
+balance resources against population, pollution and happiness. A projector
+shows the whole world; a teacher runs the game from a facilitator console.
 
-The first target is a Nashville-based game. Over time, the platform can support
-educators customizing the experience for their own cities and classrooms.
+The first scenario is set in Nashville, built with Civic Design Center.
+Scenarios are data, so educators can later adapt the game to other cities and
+classrooms. Scope and requirements: [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
 
 ## Project layout
 
@@ -72,9 +75,19 @@ To run a script in one workspace, use `-w`, for example `npm run dev -w apps/web
 
 ## Docs
 
-- [Architecture and tech stack](docs/ARCHITECTURE.md)
-- [Idle-builder prototype: design, screens, testing](docs/IDLE-PROTOTYPE.md)
-- [Contributing: workflow, reviews, check-ins](CONTRIBUTING.md)
+The specifications in [`docs/`](docs/README.md) define intended behavior:
+
+- [Requirements](docs/REQUIREMENTS.md): scope, users, screens, non-functional requirements
+- [Game rules](docs/GAME-RULES.md): phases, auction, production, stats, gifts
+- [Architecture](docs/ARCHITECTURE.md): components, action pipeline, sync, identity, environments
+- [Event log](docs/EVENTS.md): research event envelope and catalog
+- [Interactions](docs/INTERACTIONS.md): component, sequence, screen-flow and phase diagrams
+- [Idle-builder prototype](docs/IDLE-PROTOTYPE.md): design, screens and testing of the idle-builder proposal
+- [Spec guidelines](docs/SPEC-GUIDELINES.md): how the specs are written and maintained
+- [Contributing](CONTRIBUTING.md): workflow and reviews
+
+Coding agents (Claude Code, Codex, Copilot, Cursor, Gemini) start from
+[`AGENTS.md`](AGENTS.md).
 
 ## References
 
