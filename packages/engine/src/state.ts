@@ -2,7 +2,7 @@ import type { Scenario } from "@cs/shared";
 import { seedRng } from "./rng.ts";
 import type { CityState, FeatureState, GameState } from "./types.ts";
 
-// The state a game starts in. Every city gets the scenario's starting
+// The state a game starts in: the lobby, before the teacher starts it. Every city gets the scenario's starting
 // resources (missing ones at 0) and stats.
 export function createInitialState(
   scenario: Scenario,
@@ -29,6 +29,10 @@ export function createInitialState(
   return {
     scenarioId: scenario.id,
     round: scenario.start.round,
+    phase: "lobby",
+    paused: false,
+    endReason: null,
+    phaseStartedAt: null,
     seed: rng,
     rng,
     cities,

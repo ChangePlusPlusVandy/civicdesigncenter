@@ -43,10 +43,12 @@ columns every event row carries are listed in
 | `cityStatUpdate`       | `newRes.*`, `newPop`, `happiness`                                                  | `round.city_stats`              | `before`, `after`, `happinessFactor`, `populationFactor`                           |
 | (other collections)    | end-of-round team, owned and public factory state                                  | `round.snapshot` (snapshot row) | full state                                                                         |
 | `tradeResource.readBy` | field on the trade, not its own key                                                | `trade.notification_read`       | (confirm with the stakeholder)                                                     |
-| (new)                  |                                                                                    | `phase.advanced`                | `from`, `to`                                                                       |
+| (new)                  |                                                                                    | `phase.advanced`                | `from`, `to`, `round` (the round now in effect), `at`                              |
 | (new)                  |                                                                                    | `round.ended`                   | `round`                                                                            |
-| (new)                  |                                                                                    | `game.started`                  | `scenario`, `seed`                                                                 |
-| (new)                  |                                                                                    | `game.ended`                    | `reason`                                                                           |
+| (new)                  |                                                                                    | `game.started`                  | `scenario`, `seed`, `at`                                                           |
+| (new)                  |                                                                                    | `game.ended`                    | `reason` (`teacher` or `resources_exhausted`), `at`                                |
+| (new)                  |                                                                                    | `game.paused`                   | `at`                                                                               |
+| (new)                  |                                                                                    | `game.resumed`                  | `at`                                                                               |
 | (new)                  |                                                                                    | `teacher.*`                     | moderation: team assignment, kick, rename, seat reset, room lock                   |
 
 Every LC2 row also has `key`, `time` and `gameCode`, which map to `type`,
