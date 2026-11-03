@@ -15,6 +15,7 @@ Closes #
 - [ ] Tests added or updated (required for engine rules)
 - [ ] Screenshots attached for UI changes (Chromebook 1366×768 and tablet)
 - [ ] `.env.example` and docs updated if config changed
+- [ ] Specs in `docs/` updated if behavior changed; requirement IDs cited
 
 ## Tests
 
