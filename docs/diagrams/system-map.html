@@ -1,0 +1,1947 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>City Settlers System Map</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,500;0,8..60,600;1,8..60,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+    <style>
+      /* Layout: one reading column of stacked plates (architecture, round trip, screen flow, phases), each diagram in its own scroll box. Palette and faces follow apps/web/src/index.css. */
+      :root {
+        --bg: #f6f5ee;
+        --surface: #fbfaf5;
+        --ink: #24352c;
+        --muted: #6e796f;
+        --line: #d9ddd3;
+        --green: #315c45;
+        --green-soft: #e8ece5;
+        --orange: #b9603b;
+        --orange-soft: #f3e4da;
+        --planned: #8d978e;
+        --lane: #efeee6;
+        --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+        --font-body:
+          Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #131915;
+          --surface: #1a221d;
+          --ink: #e4eae1;
+          --muted: #9ba79d;
+          --line: #2f3b34;
+          --green: #86c09b;
+          --green-soft: #1f2d25;
+          --orange: #e5946e;
+          --orange-soft: #36261e;
+          --planned: #7d887f;
+          --lane: #171e19;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #131915;
+        --surface: #1a221d;
+        --ink: #e4eae1;
+        --muted: #9ba79d;
+        --line: #2f3b34;
+        --green: #86c09b;
+        --green-soft: #1f2d25;
+        --orange: #e5946e;
+        --orange-soft: #36261e;
+        --planned: #7d887f;
+        --lane: #171e19;
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font-body);
+        font-size: 15px;
+        line-height: 1.55;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+        padding-block: 40px 64px;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        gap: 56px;
+      }
+      a {
+        color: var(--green);
+      }
+      a:focus-visible,
+      button:focus-visible,
+      [tabindex]:focus-visible {
+        outline: 2px solid var(--orange);
+        outline-offset: 2px;
+      }
+      code,
+      .mono {
+        font-family: var(--font-mono);
+        font-size: 0.86em;
+      }
+
+      header.top {
+        display: grid;
+        gap: 14px;
+        max-width: 760px;
+      }
+      .eyebrow {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--green);
+      }
+      h1,
+      h2 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        text-wrap: balance;
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(34px, 5vw, 52px);
+        line-height: 1.02;
+      }
+      h2 {
+        font-size: clamp(24px, 3vw, 30px);
+        line-height: 1.15;
+      }
+      .lede {
+        color: var(--muted);
+        font-size: 17px;
+        margin: 0;
+        max-width: 65ch;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .legend .sync {
+        font-style: italic;
+      }
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .sw {
+        width: 22px;
+        height: 13px;
+        border-radius: 3px;
+        border: 1.5px solid;
+        display: inline-block;
+      }
+      .sw.built {
+        background: var(--green-soft);
+        border-color: var(--green);
+      }
+      .sw.pr {
+        background: var(--orange-soft);
+        border-color: var(--orange);
+        border-style: dashed;
+      }
+      .sw.planned {
+        background: var(--surface);
+        border-color: var(--planned);
+        border-style: dashed;
+      }
+
+      section.plate {
+        display: grid;
+        gap: 18px;
+      }
+      .plate-head {
+        display: grid;
+        gap: 6px;
+        max-width: 760px;
+      }
+      .plate-head p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .scroll {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+      }
+      .scroll svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      /* architecture */
+      .arch-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+      }
+      #arch {
+        min-width: 900px;
+      }
+      .lane-bg {
+        fill: var(--lane);
+      }
+      .lane-title {
+        font: 700 11px var(--font-body);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        fill: var(--muted);
+      }
+      .node {
+        cursor: pointer;
+      }
+      .node rect {
+        stroke-width: 1.5;
+        transition: opacity 0.15s;
+      }
+      .node.built rect {
+        fill: var(--green-soft);
+        stroke: var(--green);
+      }
+      .node.pr rect {
+        fill: var(--orange-soft);
+        stroke: var(--orange);
+        stroke-dasharray: 5 3;
+      }
+      .node.planned rect {
+        fill: var(--surface);
+        stroke: var(--planned);
+        stroke-dasharray: 5 3;
+      }
+      .node .t {
+        font: 600 13px var(--font-body);
+        fill: var(--ink);
+      }
+      .node .s {
+        font: 400 10.5px var(--font-mono);
+        fill: var(--muted);
+      }
+      .node .iss {
+        font: 500 10px var(--font-mono);
+        fill: var(--muted);
+      }
+      .node:hover rect,
+      .node.sel rect {
+        stroke-width: 2.5;
+      }
+      .node:focus {
+        outline: none;
+      }
+      .node:focus-visible rect {
+        stroke: var(--orange);
+        stroke-width: 3;
+      }
+      .edge path {
+        fill: none;
+        stroke: var(--muted);
+        stroke-width: 1.4;
+        transition: opacity 0.15s;
+      }
+      .edge.faint path {
+        stroke-dasharray: 2 4;
+        opacity: 0.55;
+      }
+      .edge.back path {
+        stroke: var(--green);
+      }
+      .edge text {
+        font: 500 10.5px var(--font-body);
+        fill: var(--ink);
+        paint-order: stroke;
+        stroke: var(--surface);
+        stroke-width: 4px;
+        stroke-linejoin: round;
+      }
+      .arrow {
+        fill: var(--muted);
+      }
+      .arrow-back {
+        fill: var(--green);
+      }
+      svg.focus .node:not(.hl),
+      svg.focus .edge:not(.hl) {
+        opacity: 0.18;
+      }
+      svg.focus .edge.hl path {
+        stroke-width: 2.2;
+        opacity: 1;
+      }
+
+      .detail {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px;
+        display: grid;
+        gap: 10px;
+        min-width: 0;
+        max-width: 820px;
+        min-height: 230px;
+        align-content: start;
+        justify-items: start;
+      }
+      .detail h3 {
+        margin: 0;
+        font: 600 19px/1.2 var(--font-display);
+      }
+      .detail .where {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .detail p {
+        margin: 0;
+        font-size: 14px;
+      }
+      .detail ul {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 14px;
+        display: grid;
+        gap: 4px;
+      }
+      .pill {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 99px;
+        border: 1px solid;
+      }
+      .pill.built {
+        color: var(--green);
+        border-color: var(--green);
+        background: var(--green-soft);
+      }
+      .pill.pr {
+        color: var(--orange);
+        border-color: var(--orange);
+        background: var(--orange-soft);
+      }
+      .pill.planned {
+        color: var(--muted);
+        border-color: var(--planned);
+      }
+      .issues {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .issues a {
+        font: 500 12px var(--font-mono);
+        text-decoration: none;
+        padding: 2px 7px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+      }
+      .issues a:hover {
+        border-color: var(--green);
+      }
+      .hint {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      /* sequence */
+      #seq {
+        min-width: 880px;
+      }
+      .ll-head rect {
+        fill: var(--green-soft);
+        stroke: var(--green);
+        stroke-width: 1.2;
+      }
+      .ll-head text {
+        font: 600 12px var(--font-body);
+        fill: var(--ink);
+      }
+      .ll-head .sub {
+        font: 400 10px var(--font-mono);
+        fill: var(--muted);
+      }
+      .ll {
+        stroke: var(--line);
+        stroke-width: 1.5;
+        stroke-dasharray: 4 4;
+      }
+      .msg path,
+      .msg line {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 1.3;
+      }
+      .msg.ret line {
+        stroke-dasharray: 5 4;
+        stroke: var(--muted);
+      }
+      .msg text {
+        font: 400 11px var(--font-mono);
+        fill: var(--ink);
+        paint-order: stroke;
+        stroke: var(--surface);
+        stroke-width: 4px;
+        stroke-linejoin: round;
+      }
+      .msg .num {
+        font: 700 10px var(--font-body);
+        fill: var(--orange);
+      }
+      .alt rect {
+        fill: var(--orange-soft);
+        stroke: var(--orange);
+        stroke-width: 1;
+        opacity: 0.6;
+      }
+      .alt text {
+        font: 700 11px var(--font-body);
+        fill: var(--orange);
+        letter-spacing: 0.06em;
+      }
+      .arr-ink {
+        fill: var(--ink);
+      }
+      .arr-muted {
+        fill: var(--muted);
+      }
+
+      .notes {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+      }
+      .note {
+        border-top: 2px solid var(--green);
+        padding-top: 10px;
+        font-size: 14px;
+        min-width: 0;
+      }
+      .note b {
+        display: block;
+        margin-bottom: 2px;
+      }
+      .note p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      /* screen flow */
+      .flows {
+        display: grid;
+        gap: 14px;
+      }
+      .flow {
+        display: grid;
+        grid-template-columns: 150px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px;
+      }
+      @media (max-width: 700px) {
+        .flow {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .persona b {
+        display: block;
+        font: 600 17px var(--font-display);
+      }
+      .persona span {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .steps {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 8px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .steps li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .steps li + li::before {
+        content: "→";
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .steps li.loop + li::before {
+        content: "↺";
+        color: var(--orange);
+      }
+      .chip {
+        border: 1.5px solid;
+        border-radius: 8px;
+        padding: 7px 10px;
+        max-width: 220px;
+        font-size: 13px;
+        line-height: 1.35;
+      }
+      .chip.built {
+        border-color: var(--green);
+        background: var(--green-soft);
+      }
+      .chip.pr {
+        border-color: var(--orange);
+        background: var(--orange-soft);
+        border-style: dashed;
+      }
+      .chip.planned {
+        border-color: var(--planned);
+        border-style: dashed;
+      }
+      .chip .r {
+        font: 500 11px var(--font-mono);
+        color: var(--green);
+        display: block;
+      }
+      .chip .i {
+        font: 500 10.5px var(--font-mono);
+        color: var(--muted);
+      }
+      .gap-note {
+        grid-column: 1 / -1;
+        font-size: 13px;
+        color: var(--orange);
+        margin: 0;
+      }
+
+      /* phases */
+      .phase-scroll {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+      }
+      table.phases {
+        border-collapse: collapse;
+        min-width: 980px;
+        width: 100%;
+        font-size: 13px;
+      }
+      .phases th,
+      .phases td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .phases thead th {
+        font: 600 16px var(--font-display);
+        border-bottom: 2px solid var(--green);
+      }
+      .phases thead th small {
+        display: block;
+        font: 500 11px var(--font-mono);
+        color: var(--muted);
+      }
+      .phases tbody th {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        width: 120px;
+      }
+      .phases td ul {
+        margin: 0;
+        padding-left: 16px;
+        display: grid;
+        gap: 3px;
+      }
+      .phases td code {
+        color: var(--orange);
+      }
+      .phases tr:last-child th,
+      .phases tr:last-child td {
+        border-bottom: 0;
+      }
+      .cycle {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0;
+      }
+
+      .open {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding-left: 20px;
+        max-width: 80ch;
+      }
+      footer {
+        font-size: 13px;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+        padding-top: 16px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="top">
+        <div class="eyebrow">City Settlers · Civic Design Center</div>
+        <h1>How the pieces talk to each other</h1>
+        <div class="legend" aria-label="Legend">
+          <span><i class="sw built"></i>On main</span>
+          <span><i class="sw pr"></i>In an open PR</span>
+          <span><i class="sw planned"></i>Planned in an issue</span>
+          <span class="sync" id="sync">Loading status from GitHub…</span>
+        </div>
+      </header>
+
+      <section class="plate" aria-labelledby="h-arch">
+        <div class="plate-head">
+          <div class="eyebrow">1 · Components</div>
+          <h2 id="h-arch">System map</h2>
+          <p>
+            Select a box to trace its connections and see the issues that build
+            it.
+          </p>
+        </div>
+        <div class="arch-grid">
+          <div class="scroll">
+            <svg
+              id="arch"
+              viewBox="0 0 1200 690"
+              role="img"
+              aria-label="Component interaction diagram"
+            ></svg>
+          </div>
+          <aside class="detail" id="detail" aria-live="polite"></aside>
+        </div>
+      </section>
+
+      <section class="plate" aria-labelledby="h-seq">
+        <div class="plate-head">
+          <div class="eyebrow">2 · One action, end to end</div>
+          <h2 id="h-seq">The action round trip</h2>
+          <p>
+            What happens when a team device places a bid, a building, or a gift.
+            The walking skeleton (#19) proves this path with a single “gift 1
+            wood” action; #25 hardens it.
+          </p>
+        </div>
+        <div class="scroll">
+          <svg
+            id="seq"
+            viewBox="0 0 1000 700"
+            role="img"
+            aria-label="Sequence diagram of a game action"
+          ></svg>
+        </div>
+        <div class="notes">
+          <div class="note">
+            <b>Full state, never diffs</b>
+            <p>
+              Every change and every reconnect sends each audience its complete
+              projection plus <code>version</code>. Clients drop anything older
+              than what they hold.
+            </p>
+          </div>
+          <div class="note">
+            <b>Safe retries</b>
+            <p>
+              <code>clientActionId</code> is de-duplicated per participant, so a
+              resend after a dropped ack does nothing twice.
+            </p>
+          </div>
+          <div class="note">
+            <b>Safe restarts</b>
+            <p>
+              One server, no Redis. Active games rehydrate from their latest
+              snapshot on boot.
+            </p>
+          </div>
+          <div class="note">
+            <b>Hidden information</b>
+            <p>
+              Sealed bids only appear in the owning team’s projection until the
+              auction resolves.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="plate" aria-labelledby="h-flow">
+        <div class="plate-head">
+          <div class="eyebrow">3 · Screens</div>
+          <h2 id="h-flow">UI flow by person</h2>
+          <p>Each person in the classroom uses a different route.</p>
+        </div>
+        <div class="flows">
+          <div class="flow">
+            <div class="persona">
+              <b>Teacher</b><span>laptop, logged in</span>
+            </div>
+            <ol class="steps">
+              <li>
+                <span class="chip built"
+                  ><span class="r">/</span>Home · “Teacher console”</span
+                >
+              </li>
+              <li>
+                <span class="chip planned"
+                  ><span class="r">/teach</span>Sign up with invite code; log in
+                  by email or Google <span class="i">#24</span></span
+                >
+              </li>
+              <li>
+                <span class="chip planned"
+                  ><span class="r">/teach</span>Create a game from a scenario,
+                  get a room code <span class="i">#36 #49</span></span
+                >
+              </li>
+              <li>
+                <span class="chip planned"
+                  ><span class="r">/teach/:gameId</span>Lobby: assign teams,
+                  lock room <span class="i">#36</span></span
+                >
+              </li>
+              <li>
+                <span class="chip planned"
+                  ><span class="r">/teach/:gameId</span>Run: start, advance
+                  phase, pause, kick, rename, reset seat, end
+                  <span class="i">#36</span></span
+                >
+              </li>
+              <li>
+                <span class="chip planned"
+                  ><span class="r">/projector/:code</span>Open on the classroom
+                  screen <span class="i">#37</span></span
+                >
+              </li>
+            </ol>
+          </div>
+          <div class="flow">
+            <div class="persona">
+              <b>Student</b><span>every player, on any device</span>
+            </div>
+            <ol class="steps">
+              <li>
+                <span class="chip built"
+                  ><span class="r">/join</span>Room code, username and PIN</span
+                >
+              </li>
+              <li>
+                <span class="chip planned"
+                  ><span class="r">POST /api/games/:code/join</span>Unique,
+                  filtered name and a PIN → token in localStorage
+                  <span class="i">#24</span></span
+                >
+              </li>
+              <li>
+                <span class="chip planned"
+                  ><span class="r">/city/:code</span>Lobby: wait for the
+                  teacher, see team <span class="i">#32 #35</span></span
+                >
+              </li>
+              <li>
+                <span class="chip planned"
+                  >Auction: sealed bids against team stock, ready-up
+                  <span class="i">#33 #35</span></span
+                >
+              </li>
+              <li>
+                <span class="chip planned"
+                  >Build: place, remove, toggle buildings on the grid
+                  <span class="i">#32</span></span
+                >
+              </li>
+              <li class="loop">
+                <span class="chip planned"
+                  >Resolve: city status panel shows money, population,
+                  pollution, happiness <span class="i">#35</span></span
+                >
+              </li>
+              <li>
+                <span class="chip planned">Next round, back to auction</span>
+              </li>
+            </ol>
+            <p class="gap-note">
+              In the auction, build and resolve phases, a student can gift
+              resources to another team. The gift goes through right away, with
+              no team approval. To re-join on a new device or after losing the
+              token, a student enters the same username and PIN.
+            </p>
+          </div>
+          <div class="flow">
+            <div class="persona">
+              <b>Student view</b><span>personal device</span>
+            </div>
+            <ol class="steps">
+              <li>
+                <span class="chip planned"
+                  ><span class="r">/play/:code</span>Personal view with team
+                  resources and gift history
+                  <span class="i">#43 #34 #67</span></span
+                >
+              </li>
+            </ol>
+          </div>
+          <div class="flow">
+            <div class="persona">
+              <b>Projector</b><span>classroom screen, no input</span>
+            </div>
+            <ol class="steps">
+              <li>
+                <span class="chip planned"
+                  ><span class="r">/projector/:code</span>Public world view:
+                  map, phase, city stats; never sealed bids
+                  <span class="i">#37 #44</span></span
+                >
+              </li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="plate" aria-labelledby="h-phase">
+        <div class="plate-head">
+          <div class="eyebrow">4 · Game loop</div>
+          <h2 id="h-phase">Who does what in each phase</h2>
+          <p>
+            The engine’s phase state machine (#21) decides which actions are
+            legal. Event types come from <code>docs/EVENTS.md</code> (#64).
+          </p>
+        </div>
+        <div class="phase-scroll">
+          <table class="phases">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Lobby<small>before round 1</small></th>
+                <th>Auction<small>#22 #33</small></th>
+                <th>Build<small>#23 #32</small></th>
+                <th>Resolve<small>#23 #29</small></th>
+                <th>End<small>#21</small></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th>Teacher</th>
+                <td>
+                  <ul>
+                    <li>Assign teams</li>
+                    <li>Rename, kick, lock room</li>
+                    <li>Start game</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Watch ready-up</li>
+                    <li>Advance or pause</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Advance or pause</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Review stats</li>
+                    <li>Start next round</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>
+                      Ended by <code>endGame</code>, or at round end when every
+                      harvestable nature stock is 0
+                    </li>
+                    <li>Export the log (#48)</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <th>Student</th>
+                <td>
+                  <ul>
+                    <li>Join and wait</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Change sealed bids on lots</li>
+                    <li>Bids checked against team stock</li>
+                    <li>Set ready</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Place won buildings on the grid</li>
+                    <li>Remove, toggle on or off</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>See production and new city stats</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Final city stats</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <th>Trading</th>
+                <td>
+                  <ul>
+                    <li>—</li>
+                  </ul>
+                </td>
+                <td colspan="3">
+                  <ul>
+                    <li>
+                      Any player can gift resources to another team. There is no
+                      team approval: the gift applies at once and logs
+                      <code>trade.gift_sent</code>. Rejected while paused.
+                    </li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>—</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <th>Projector</th>
+                <td>
+                  <ul>
+                    <li>Room code, joined teams</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Lots on offer, who is ready</li>
+                    <li>No bid amounts</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>World map with every city</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>City stats side by side</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Final results</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <th>Engine</th>
+                <td>
+                  <ul>
+                    <li>Load scenario, seed RNG</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Draw lots with the seeded RNG</li>
+                    <li>Resolve sealed bids and ties</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Check placement, 4-neighbour adjacency</li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Run buildings, capped by population</li>
+                    <li>Apply adjacency bonuses, nature, stats</li>
+                    <li>
+                      Stat rules follow LC2, with reasonable values where LC2
+                      has none
+                    </li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>Check end conditions</li>
+                  </ul>
+                </td>
+              </tr>
+              <tr>
+                <th>Events logged</th>
+                <td>
+                  <ul>
+                    <li><code>teacher.*</code></li>
+                    <li><code>game.started</code></li>
+                    <li><code>phase.advanced</code></li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li><code>auction.lot_added</code></li>
+                    <li><code>auction.bid_changed</code></li>
+                    <li><code>auction.ready_set</code></li>
+                    <li>
+                      <code>auction.lot_won</code> / <code>lot_unsold</code>
+                    </li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li><code>building.placed</code></li>
+                    <li><code>building.removed</code></li>
+                    <li><code>building.toggled</code></li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li><code>production.building_ran</code></li>
+                    <li><code>round.city_stats</code></li>
+                    <li><code>round.snapshot</code></li>
+                    <li><code>round.ended</code></li>
+                  </ul>
+                </td>
+                <td>
+                  <ul>
+                    <li>
+                      <code>game.ended</code> (<code>teacher</code> or
+                      <code>resources_exhausted</code>)
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="cycle">
+          Leaving Resolve ends the round (<code>round.ended</code>) and opens
+          the next Auction. <code>phase.advanced</code> carries
+          <code>from</code>, <code>to</code>, <code>round</code> and
+          <code>at</code>. <code>pauseGame</code> and
+          <code>resumeGame</code> toggle a <code>paused</code> flag in Auction,
+          Build or Resolve and log <code>game.paused</code> and
+          <code>game.resumed</code>. Rejected attempts are logged with
+          <code>outcome: rejected</code>. Notification read state is client-only
+          and not logged.
+        </p>
+      </section>
+
+      <footer>
+        Mirrors docs/INTERACTIONS.md; the specifications in docs/ take
+        precedence. “In an open PR” means PR #70 (Drizzle schema for #16). Issue
+        numbers link to GitHub from the system map.
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        const REPO =
+          "https://github.com/ChangePlusPlusVandy/civicdesigncenter/issues/";
+        const NS = "http://www.w3.org/2000/svg";
+        const LANES = [
+          { x: 16, w: 200, title: "Devices & routes" },
+          { x: 336, w: 200, title: "Web · apps/web" },
+          { x: 656, w: 210, title: "Server · apps/server" },
+          { x: 986, w: 198, title: "Packages & data" },
+        ];
+        const N = [
+          // lane, y, h
+          {
+            id: "dev-teacher",
+            lane: 0,
+            y: 70,
+            h: 80,
+            t: "Teacher console",
+            s: ["/teach", "/teach/:gameId"],
+            st: "planned",
+            iss: [36, 24],
+            d: "The facilitator’s laptop. Signs in, creates a game, assigns teams, then advances phases and moderates during play.",
+            c: ["Teacher sign-in", "Game views (console)"],
+          },
+          {
+            id: "dev-seat",
+            lane: 0,
+            y: 200,
+            h: 80,
+            t: "Student device",
+            s: ["/city/:code", "every player lands here"],
+            st: "planned",
+            iss: [32, 33, 35],
+            d: "Where Join sends every player for now. Shows the city map, auction, status panel and ready-up. Any player can gift from here in the auction, build and resolve phases, with no team approval.",
+            c: ["Join form", "Game views (city)"],
+          },
+          {
+            id: "dev-trader",
+            lane: 0,
+            y: 330,
+            h: 80,
+            t: "Student view",
+            s: ["/play/:code", "personal device"],
+            st: "planned",
+            iss: [43, 34, 67],
+            d: "A personal view with team resources and gift history. Players reach it from the city view; Join lands every player on /city/:code. It uses the same game-scoped player token, so there are no student accounts.",
+            c: ["Join form", "Game views (trade)"],
+          },
+          {
+            id: "dev-proj",
+            lane: 0,
+            y: 460,
+            h: 80,
+            t: "Classroom projector",
+            s: ["/projector/:code", "read-only"],
+            st: "planned",
+            iss: [37],
+            d: "The whole-room display. Receives the public projection: map, phase, city stats. Never sees sealed bids.",
+            c: ["Game views (projector)"],
+          },
+
+          {
+            id: "web-shell",
+            lane: 1,
+            y: 70,
+            h: 64,
+            t: "Router + AppLayout",
+            s: ["App.tsx · 7 routes"],
+            st: "built",
+            iss: [14],
+            d: "React Router with the shared header and footer. Routes: /, /join, /play/:code, /city/:code, /projector/:code, /teach, /teach/:gameId, plus a 404.",
+            c: ["Static SPA (served in production)"],
+          },
+          {
+            id: "web-auth",
+            lane: 1,
+            y: 170,
+            h: 64,
+            t: "Teacher sign-in",
+            s: ["Better Auth client"],
+            st: "planned",
+            iss: [24],
+            d: "Invite-code signup, then email + password or Google. Google sign-in only works on the staging origin; Vercel previews use email + password.",
+            c: ["Teacher console", "Better Auth + game_roles"],
+          },
+          {
+            id: "web-join",
+            lane: 1,
+            y: 270,
+            h: 64,
+            t: "Join form",
+            s: ["JoinPage → /city/:code"],
+            st: "built",
+            iss: [14, 24],
+            d: "Validates a 4–8 character room code (normalizeRoomCode from @cs/shared), a 2–24 character username and a PIN, calls the join endpoint, stores the returned token in localStorage and navigates to /city/:code. The same username and PIN re-join a player.",
+            c: ["Student device", "REST API"],
+          },
+          {
+            id: "web-usegame",
+            lane: 1,
+            y: 370,
+            h: 80,
+            t: "useGame hook",
+            s: ["socket.io-client", "latest version wins"],
+            st: "planned",
+            iss: [26],
+            d: "Opens the socket with the token in the auth payload, keeps the newest projection and ignores stale versions, handles reconnects and action acks. Ships with a debug page showing raw state and the live event log.",
+            c: ["Socket.IO gateway", "Projections", "Game views"],
+          },
+          {
+            id: "web-views",
+            lane: 1,
+            y: 490,
+            h: 100,
+            t: "Game views",
+            s: ["city map · auction", "status · trade", "console · projector"],
+            st: "planned",
+            iss: [31, 32, 33, 34, 35, 36, 37],
+            d: "The MVP screens, themed with the design tokens (#31). Each renders only from the projection useGame holds and sends intents back through it.",
+            c: ["useGame hook", "every device"],
+          },
+
+          {
+            id: "srv-auth",
+            lane: 2,
+            y: 70,
+            h: 64,
+            t: "Better Auth + game_roles",
+            s: ["teacher sessions"],
+            st: "planned",
+            iss: [24],
+            d: "Teacher accounts and sessions. Every teacher action checks game_roles before it runs.",
+            c: ["Teacher sign-in"],
+          },
+          {
+            id: "srv-rest",
+            lane: 2,
+            y: 170,
+            h: 64,
+            t: "REST · Express 5",
+            s: ["/api/healthz", "POST …/games/:code/join"],
+            st: "built",
+            iss: [24],
+            d: "/healthz and /api/healthz return { ok, engineVersion }; other /api paths return 404. The join endpoint checks the name is unique per game and passes a profanity filter, stores a token hash, and returns a token with participantId, teamId and role. A player re-joins on a new device with the same username and PIN.",
+            c: ["Join form", "Postgres"],
+          },
+          {
+            id: "srv-socket",
+            lane: 2,
+            y: 270,
+            h: 70,
+            t: "Socket.IO gateway",
+            s: ["token auth middleware", "rooms per audience"],
+            st: "planned",
+            iss: [17],
+            d: "Reads the token from the socket auth payload and builds the actor { gameId, participantId, teamId, role }. Joins rooms per game, team, player, projector and teacher. Sends the full projection on every (re)connect.",
+            c: ["useGame hook", "Action pipeline"],
+          },
+          {
+            id: "srv-pipe",
+            lane: 2,
+            y: 380,
+            h: 90,
+            t: "Action pipeline",
+            s: ["mutex → zod → can()", "→ reduce → tx → ack"],
+            st: "planned",
+            iss: [19, 25],
+            d: "One action at a time per game. Validates with zod, checks can(role, type), runs the engine, writes events and the next snapshot in one transaction with an optimistic version check, broadcasts, then acks. Rejections are logged in their own transaction.",
+            c: ["Socket.IO gateway", "@cs/engine", "Postgres", "Projections"],
+          },
+          {
+            id: "srv-project",
+            lane: 2,
+            y: 510,
+            h: 64,
+            t: "Projections",
+            s: ["project(state, audience)"],
+            st: "planned",
+            iss: [17],
+            d: "Cuts the full state down to what each audience may see (team, player, projector, teacher) and broadcasts it to that room with the version.",
+            c: ["Action pipeline", "useGame hook"],
+          },
+          {
+            id: "srv-static",
+            lane: 2,
+            y: 610,
+            h: 56,
+            t: "Static SPA + fallback",
+            s: ["serves apps/web/dist"],
+            st: "built",
+            iss: [14],
+            d: "In production the server serves the built client and returns index.html for client routes, leaving /api and /socket.io alone. In dev, Vite serves the client and proxies /api and /socket.io to :3000.",
+            c: ["Router + AppLayout"],
+          },
+
+          {
+            id: "pkg-shared",
+            lane: 3,
+            y: 70,
+            h: 80,
+            t: "@cs/shared",
+            s: ["room codes · zod schemas", "can(role, action)"],
+            st: "built",
+            iss: [64, 25],
+            d: "Used by both web and server: HealthResponse, normalizeRoomCode, action and socket-event schemas, projection and scenario types, event payload schemas, and the can(role, actionType) table.",
+            c: ["Join form", "Action pipeline"],
+          },
+          {
+            id: "pkg-engine",
+            lane: 3,
+            y: 190,
+            h: 80,
+            t: "@cs/engine",
+            s: ["reduce(scenario, state,", "action) → { ok, events }"],
+            st: "planned",
+            iss: [15, 20, 21, 22, 23, 29],
+            d: "Pure and deterministic: reduce returns { ok: true, state, events } or { ok: false, error }; applyEvent is the only state mutation; the mulberry32 RNG state and time (action.at) are inputs. Works in scenario city ids; the server maps teams through teams.city_key. Covers phases (lobby, auction, build, resolve, ended, plus a paused flag), permissions, gifts, auctions, the grid map, production and city stats (LC2 formulas, scenario values). replay(scenario, seed, events) reproduces state exactly.",
+            c: ["Action pipeline", "Scenarios"],
+          },
+          {
+            id: "pkg-scen",
+            lane: 3,
+            y: 310,
+            h: 60,
+            t: "Scenarios",
+            s: ["nashville-v1.json"],
+            st: "planned",
+            iss: [27, 38, 49],
+            d: "Scenario JSON validated by a zod schema: resources, buildings, map, cities, starting stats. lc2-default.json for engine work, nashville-v1.json for the MVP. Teachers can upload scenario JSON.",
+            c: ["@cs/engine"],
+          },
+          {
+            id: "db",
+            lane: 3,
+            y: 410,
+            h: 90,
+            t: "Postgres",
+            s: ["PGlite / Neon", "snapshots · events"],
+            st: "pr",
+            iss: [16],
+            d: "Drizzle schema: games, players, teams, game_roles, snapshots (state JSON + version, one per round) and an append-only events log with gapless per-game seq. PGlite when DATABASE_URL is blank, Neon in deployed environments.",
+            c: ["Action pipeline", "REST API", "Data export"],
+          },
+          {
+            id: "export",
+            lane: 3,
+            y: 540,
+            h: 60,
+            t: "Data export CLI",
+            s: ["CSV / JSON per game"],
+            st: "planned",
+            iss: [48, 65],
+            d: "For researchers: events and per-round snapshots, pseudonymous participant IDs only. A logging parity test checks coverage against LC2 (#65).",
+            c: ["Postgres"],
+          },
+        ];
+        const E = [
+          {
+            f: "dev-teacher",
+            fs: "r",
+            t: "web-auth",
+            ts: "l",
+            label: "sign in",
+          },
+          {
+            f: "dev-seat",
+            fs: "r",
+            t: "web-join",
+            ts: "l",
+            tf: 0.35,
+            label: "code + name",
+          },
+          { f: "dev-trader", fs: "r", t: "web-join", ts: "l", tf: 0.75 },
+          {
+            f: "dev-teacher",
+            fs: "r",
+            ff: 0.8,
+            t: "web-views",
+            ts: "l",
+            tf: 0.15,
+            faint: true,
+          },
+          {
+            f: "dev-seat",
+            fs: "r",
+            ff: 0.8,
+            t: "web-views",
+            ts: "l",
+            tf: 0.35,
+            faint: true,
+          },
+          {
+            f: "dev-trader",
+            fs: "r",
+            ff: 0.8,
+            t: "web-views",
+            ts: "l",
+            tf: 0.6,
+            faint: true,
+          },
+          {
+            f: "dev-proj",
+            fs: "r",
+            t: "web-views",
+            ts: "l",
+            tf: 0.85,
+            faint: true,
+          },
+          { f: "web-auth", fs: "r", t: "srv-auth", ts: "l", label: "session" },
+          {
+            f: "web-join",
+            fs: "r",
+            t: "srv-rest",
+            ts: "l",
+            label: "POST join → token",
+          },
+          {
+            f: "web-usegame",
+            fs: "r",
+            ff: 0.3,
+            t: "srv-socket",
+            ts: "l",
+            tf: 0.65,
+            label: "emit action",
+          },
+          {
+            f: "srv-project",
+            fs: "l",
+            t: "web-usegame",
+            ts: "r",
+            tf: 0.75,
+            label: "state + version",
+            back: true,
+          },
+          {
+            f: "web-usegame",
+            fs: "b",
+            t: "web-views",
+            ts: "t",
+            label: "projection",
+          },
+          {
+            f: "srv-socket",
+            fs: "b",
+            t: "srv-pipe",
+            ts: "t",
+            label: "actor + intent",
+          },
+          {
+            f: "srv-pipe",
+            fs: "b",
+            t: "srv-project",
+            ts: "t",
+            label: "new state",
+          },
+          {
+            f: "srv-pipe",
+            fs: "r",
+            ff: 0.3,
+            t: "pkg-engine",
+            ts: "l",
+            tf: 0.7,
+            label: "reduce()",
+          },
+          {
+            f: "srv-pipe",
+            fs: "r",
+            ff: 0.7,
+            t: "db",
+            ts: "l",
+            tf: 0.7,
+            label: "events + snapshot",
+          },
+          {
+            f: "srv-rest",
+            fs: "r",
+            t: "db",
+            ts: "l",
+            tf: 0.3,
+            label: "player + token hash",
+          },
+          {
+            f: "pkg-scen",
+            fs: "t",
+            t: "pkg-engine",
+            ts: "b",
+            label: "rules data",
+          },
+          { f: "db", fs: "b", t: "export", ts: "t", label: "read" },
+          {
+            f: "srv-static",
+            fs: "l",
+            t: "web-shell",
+            ts: "r",
+            faint: true,
+            back: true,
+          },
+        ];
+        const STATUS = {
+          built: "On main",
+          pr: "In open PR",
+          planned: "Planned",
+        };
+
+        const el = (tag, attrs, parent) => {
+          const e = document.createElementNS(NS, tag);
+          for (const k in attrs) e.setAttribute(k, attrs[k]);
+          if (parent) parent.appendChild(e);
+          return e;
+        };
+        const byId = {};
+        N.forEach((n) => {
+          const L = LANES[n.lane];
+          n.x = L.x + 10;
+          n.w = L.w - 20;
+          byId[n.id] = n;
+        });
+
+        // ---------- architecture ----------
+        const arch = document.getElementById("arch");
+        const defs = el("defs", {}, arch);
+        [
+          ["a-muted", "arrow"],
+          ["a-back", "arrow-back"],
+        ].forEach(([id, cls]) => {
+          const m = el(
+            "marker",
+            {
+              id,
+              viewBox: "0 0 10 10",
+              refX: "9",
+              refY: "5",
+              markerWidth: "7",
+              markerHeight: "7",
+              orient: "auto-start-reverse",
+            },
+            defs,
+          );
+          el("path", { d: "M0,0 L10,5 L0,10 z", class: cls }, m);
+        });
+        LANES.forEach((L) => {
+          el(
+            "rect",
+            {
+              x: L.x,
+              y: 16,
+              width: L.w,
+              height: 660,
+              rx: 10,
+              class: "lane-bg",
+            },
+            arch,
+          );
+          el(
+            "text",
+            { x: L.x + 12, y: 42, class: "lane-title" },
+            arch,
+          ).textContent = L.title;
+        });
+        const DIR = { l: [-1, 0], r: [1, 0], t: [0, -1], b: [0, 1] };
+        const anchor = (n, side, f = 0.5) =>
+          side === "l"
+            ? [n.x, n.y + n.h * f]
+            : side === "r"
+              ? [n.x + n.w, n.y + n.h * f]
+              : side === "t"
+                ? [n.x + n.w * f, n.y]
+                : [n.x + n.w * f, n.y + n.h];
+        const edgeLayer = el("g", {}, arch);
+        const edgeEls = E.map((e) => {
+          const a = byId[e.f],
+            b = byId[e.t];
+          const p1 = anchor(a, e.fs, e.ff),
+            p2 = anchor(b, e.ts, e.tf);
+          const dist = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+          const k = Math.max(30, Math.min(70, dist / 2.6));
+          const c1 = [p1[0] + DIR[e.fs][0] * k, p1[1] + DIR[e.fs][1] * k];
+          const c2 = [p2[0] + DIR[e.ts][0] * k, p2[1] + DIR[e.ts][1] * k];
+          const g = el(
+            "g",
+            {
+              class:
+                "edge" + (e.faint ? " faint" : "") + (e.back ? " back" : ""),
+            },
+            edgeLayer,
+          );
+          el(
+            "path",
+            {
+              d: `M${p1} C${c1} ${c2} ${p2}`,
+              "marker-end": `url(#${e.back ? "a-back" : "a-muted"})`,
+            },
+            g,
+          );
+          if (e.label) {
+            const mx =
+              0.125 * p1[0] + 0.375 * c1[0] + 0.375 * c2[0] + 0.125 * p2[0];
+            const my =
+              0.125 * p1[1] + 0.375 * c1[1] + 0.375 * c2[1] + 0.125 * p2[1];
+            const vertical = e.fs === "b" || e.fs === "t";
+            el(
+              "text",
+              {
+                x: vertical ? mx + 8 : mx,
+                y: my + 4,
+                "text-anchor": vertical ? "start" : "middle",
+              },
+              g,
+            ).textContent = e.label;
+          }
+          return { g, e };
+        });
+        const nodeEls = {};
+        N.forEach((n) => {
+          const g = el(
+            "g",
+            {
+              class: "node " + n.st,
+              tabindex: "0",
+              role: "button",
+              "aria-label": `${n.t}, ${STATUS[n.st]}`,
+            },
+            arch,
+          );
+          el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 7 }, g);
+          el("text", { x: n.x + 10, y: n.y + 20, class: "t" }, g).textContent =
+            n.t;
+          n.s.forEach((line, i) => {
+            el(
+              "text",
+              { x: n.x + 10, y: n.y + 37 + i * 14, class: "s" },
+              g,
+            ).textContent = line;
+          });
+          el(
+            "text",
+            {
+              x: n.x + n.w - 8,
+              y: n.y + n.h - 8,
+              class: "iss",
+              "text-anchor": "end",
+            },
+            g,
+          ).textContent =
+            n.iss
+              .slice(0, 3)
+              .map((i) => "#" + i)
+              .join(" ") + (n.iss.length > 3 ? " …" : "");
+          g.addEventListener("click", () => select(n.id));
+          g.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              select(n.id);
+            }
+          });
+          nodeEls[n.id] = g;
+        });
+
+        const detail = document.getElementById("detail");
+        let current = null;
+        function select(id) {
+          if (current === id) id = null;
+          current = id;
+          Object.values(nodeEls).forEach((g) =>
+            g.classList.remove("sel", "hl"),
+          );
+          edgeEls.forEach(({ g }) => g.classList.remove("hl"));
+          if (!id) {
+            arch.classList.remove("focus");
+            renderIntro();
+            return;
+          }
+          arch.classList.add("focus");
+          nodeEls[id].classList.add("sel", "hl");
+          edgeEls.forEach(({ g, e }) => {
+            if (e.f === id || e.t === id) {
+              g.classList.add("hl");
+              nodeEls[e.f].classList.add("hl");
+              nodeEls[e.t].classList.add("hl");
+            }
+          });
+          const n = byId[id];
+          detail.innerHTML = "";
+          const h = document.createElement("h3");
+          h.textContent = n.t;
+          const where = document.createElement("div");
+          where.className = "where";
+          where.textContent = n.s.join(" · ");
+          const pill = document.createElement("span");
+          pill.className = "pill " + n.st;
+          pill.textContent = STATUS[n.st];
+          const p = document.createElement("p");
+          p.textContent = n.d;
+          const lbl = document.createElement("div");
+          lbl.className = "hint";
+          lbl.textContent = "Talks to";
+          const ul = document.createElement("ul");
+          n.c.forEach((c) => {
+            const li = document.createElement("li");
+            li.textContent = c;
+            ul.appendChild(li);
+          });
+          const iss = document.createElement("div");
+          iss.className = "issues";
+          n.iss.forEach((i) => {
+            const a = document.createElement("a");
+            a.href = REPO + i;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.textContent = "#" + i;
+            iss.appendChild(a);
+          });
+          detail.append(pill, h, where, p, lbl, ul, iss);
+        }
+        function renderIntro() {
+          detail.innerHTML = `<span class="pill built">Overview</span><h3>Server-authoritative state model</h3>
+      <p>Clients emit intents over Socket.IO. The action pipeline serializes them per game, validates them, applies them through the deterministic engine, persists the resulting events and a versioned snapshot in one transaction, then broadcasts a full projection to each audience (green edges). All other edges are requests or build-time dependencies.</p>
+      <ul><li>Players: room code, username and PIN exchanged for a game-scoped bearer token (hash stored); no accounts.</li>
+      <li>Teachers: Better Auth session; every teacher action is authorized against <code>game_roles</code>.</li>
+      <li><code>@cs/engine</code>: pure <code>reduce(scenario, state, action)</code> with no I/O; the server owns persistence and transport.</li></ul>
+      <p class="hint">Select a component for its contract, dependencies and tracking issues.</p>`;
+        }
+        renderIntro();
+
+        // ---------- live status from GitHub ----------
+        // A box is "pr" when an open PR references one of its issues, "built"
+        // when all of its issues are closed, and "planned" otherwise. If GitHub
+        // is unreachable, the statuses written above stay.
+        const API =
+          "https://api.github.com/repos/ChangePlusPlusVandy/civicdesigncenter/issues?state=all&per_page=100&page=";
+        const sync = document.getElementById("sync");
+        const statusFor = (nums, closed, inPr) =>
+          nums.some((i) => inPr.has(i))
+            ? "pr"
+            : nums.every((i) => closed.has(i))
+              ? "built"
+              : "planned";
+        async function loadStatus() {
+          const items = [];
+          for (let page = 1; page <= 5; page++) {
+            const res = await fetch(API + page);
+            if (!res.ok) throw new Error("GitHub " + res.status);
+            const batch = await res.json();
+            items.push(...batch);
+            if (batch.length < 100) break;
+          }
+          const closed = new Set();
+          const inPr = new Set();
+          const closing =
+            /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
+          for (const it of items) {
+            if (!it.pull_request) {
+              if (it.state === "closed") closed.add(it.number);
+            } else if (it.state === "open") {
+              for (const m of (it.body || "").matchAll(closing))
+                inPr.add(Number(m[1]));
+              for (const m of (it.title || "").matchAll(/#(\d+)/g))
+                inPr.add(Number(m[1]));
+            }
+          }
+          N.forEach((n) => {
+            n.st = statusFor(n.iss, closed, inPr);
+            const g = nodeEls[n.id];
+            g.classList.remove("built", "pr", "planned");
+            g.classList.add(n.st);
+            g.setAttribute("aria-label", `${n.t}, ${STATUS[n.st]}`);
+          });
+          document.querySelectorAll(".chip .i").forEach((span) => {
+            const nums = [...span.textContent.matchAll(/#(\d+)/g)].map((m) =>
+              Number(m[1]),
+            );
+            if (!nums.length) return;
+            const chip = span.closest(".chip");
+            chip.classList.remove("built", "pr", "planned");
+            chip.classList.add(statusFor(nums, closed, inPr));
+          });
+          if (current) {
+            const id = current;
+            current = null;
+            select(id);
+          }
+          sync.textContent =
+            "Live from GitHub issues · " + new Date().toLocaleString();
+        }
+        loadStatus().catch(() => {
+          sync.textContent = "GitHub unreachable · showing statuses as written";
+        });
+
+        // ---------- sequence ----------
+        const seq = document.getElementById("seq");
+        const sdefs = el("defs", {}, seq);
+        [
+          ["s-ink", "arr-ink"],
+          ["s-muted", "arr-muted"],
+        ].forEach(([id, cls]) => {
+          const m = el(
+            "marker",
+            {
+              id,
+              viewBox: "0 0 10 10",
+              refX: "9",
+              refY: "5",
+              markerWidth: "8",
+              markerHeight: "8",
+              orient: "auto",
+            },
+            sdefs,
+          );
+          el("path", { d: "M0,0 L10,5 L0,10 z", class: cls }, m);
+        });
+        const P = [
+          { id: "dev", t: "Team device", s: "useGame" },
+          { id: "gw", t: "Socket.IO", s: "auth middleware" },
+          { id: "pipe", t: "Action pipeline", s: "per-game mutex" },
+          { id: "eng", t: "@cs/engine", s: "reduce()" },
+          { id: "db", t: "Postgres", s: "events · snapshots" },
+          { id: "aud", t: "Every audience", s: "one room per audience" },
+        ];
+        const X = {};
+        P.forEach((p, i) => (X[p.id] = 80 + i * 168));
+        const M = [
+          {
+            f: "dev",
+            t: "gw",
+            l: 'emit("action", { clientActionId, type, payload })',
+          },
+          {
+            f: "gw",
+            t: "pipe",
+            l: "actor { gameId, participantId, teamId, role }",
+          },
+          {
+            f: "pipe",
+            t: "pipe",
+            l: "lock game · zod parse · dedupe clientActionId",
+          },
+          { f: "pipe", t: "pipe", l: "can(role, action.type)" },
+          { f: "pipe", t: "eng", l: "reduce(scenario, state, action)" },
+          { f: "eng", t: "pipe", l: "{ state, events }", ret: true },
+          {
+            f: "pipe",
+            t: "db",
+            l: "insert events · update snapshot WHERE version = v",
+          },
+          { f: "db", t: "pipe", l: "commit → version v + 1", ret: true },
+          {
+            f: "pipe",
+            t: "aud",
+            l: "project(state, audience) → full state + version",
+          },
+          { f: "pipe", t: "dev", l: "ack({ ok: true, version })", ret: true },
+          { alt: true },
+          {
+            f: "pipe",
+            t: "pipe",
+            l: "FORBIDDEN from can(), or a RuleError from reduce()",
+          },
+          {
+            f: "pipe",
+            t: "db",
+            l: "insert one event, outcome: rejected (own tx)",
+          },
+          {
+            f: "pipe",
+            t: "dev",
+            l: "ack({ ok: false, code }) · state and version unchanged",
+            ret: true,
+          },
+        ];
+        const top = 20,
+          headH = 46,
+          row = 42;
+        let y = top + headH + 34;
+        const rows = [];
+        M.forEach((m) => {
+          if (m.alt) {
+            m.y = y - 6;
+            y += 30;
+          } else {
+            m.y = y;
+            y += m.f === m.t ? row + 12 : row;
+          }
+          rows.push(m);
+        });
+        const H = y + 10;
+        seq.setAttribute("viewBox", `0 0 1000 ${H}`);
+        const altStart = M.findIndex((m) => m.alt);
+        const altY = M[altStart].y;
+        const alt = el("g", { class: "alt" }, seq);
+        el(
+          "rect",
+          { x: 12, y: altY, width: 976, height: H - altY - 12, rx: 8 },
+          alt,
+        );
+        el("text", { x: 24, y: altY + 18 }, alt).textContent = "IF REJECTED";
+        P.forEach((p) => {
+          el(
+            "line",
+            {
+              x1: X[p.id],
+              y1: top + headH,
+              x2: X[p.id],
+              y2: H - 14,
+              class: "ll",
+            },
+            seq,
+          );
+          const g = el("g", { class: "ll-head" }, seq);
+          el(
+            "rect",
+            { x: X[p.id] - 74, y: top, width: 148, height: headH, rx: 7 },
+            g,
+          );
+          el(
+            "text",
+            { x: X[p.id], y: top + 20, "text-anchor": "middle" },
+            g,
+          ).textContent = p.t;
+          el(
+            "text",
+            { x: X[p.id], y: top + 36, "text-anchor": "middle", class: "sub" },
+            g,
+          ).textContent = p.s;
+        });
+        let num = 0;
+        rows.forEach((m) => {
+          if (m.alt) return;
+          num++;
+          const g = el("g", { class: "msg" + (m.ret ? " ret" : "") }, seq);
+          const x1 = X[m.f],
+            x2 = X[m.t];
+          if (m.f === m.t) {
+            el(
+              "path",
+              { d: `M${x1},${m.y} h36 v18 h-34`, "marker-end": "url(#s-ink)" },
+              g,
+            );
+            el("text", { x: x1 + 46, y: m.y + 13 }, g).textContent = m.l;
+            el(
+              "text",
+              { x: x1 - 10, y: m.y + 4, "text-anchor": "end", class: "num" },
+              g,
+            ).textContent = num;
+          } else {
+            const dir = Math.sign(x2 - x1);
+            el(
+              "line",
+              {
+                x1,
+                y1: m.y,
+                x2: x2 - dir * 2,
+                y2: m.y,
+                "marker-end": `url(#${m.ret ? "s-muted" : "s-ink"})`,
+              },
+              g,
+            );
+            const lx = Math.min(x1, x2) + 12;
+            el("text", { x: lx, y: m.y - 7 }, g).textContent = m.l;
+            el(
+              "text",
+              {
+                x: x1 + (dir > 0 ? -10 : 10),
+                y: m.y + 4,
+                "text-anchor": dir > 0 ? "end" : "start",
+                class: "num",
+              },
+              g,
+            ).textContent = num;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
