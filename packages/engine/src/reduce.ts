@@ -42,20 +42,23 @@ function giftResource(
 ): ReduceResult {
   const { actor } = action;
   if (actor.kind !== "player") {
-    return fail("NOT_ALLOWED", "only players can gift resources");
+    return fail("FORBIDDEN", "only players can gift resources");
   }
 
   const { to, resource, amount } = action.payload;
   const from = actor.cityId;
-  const giver = state.cities[from];
-  const receiver = state.cities[to];
-  if (giver === undefined) {
+  // hasOwn, not a lookup: "constructor" and "toString" are inherited keys.
+  if (!Object.hasOwn(state.cities, from)) {
     return fail("UNKNOWN_CITY", `unknown city "${from}"`);
   }
-  if (receiver === undefined) {
+  if (!Object.hasOwn(state.cities, to)) {
     return fail("UNKNOWN_CITY", `unknown city "${to}"`);
   }
-  if (from === to) return fail("NOT_ALLOWED", "a city cannot gift to itself");
+  const giver = state.cities[from]!;
+  const receiver = state.cities[to]!;
+  if (from === to) {
+    return fail("INVALID_TARGET", "a city cannot gift to itself");
+  }
   if (!scenario.resources.some((r) => r.id === resource)) {
     return fail("UNKNOWN_RESOURCE", `unknown resource "${resource}"`);
   }
