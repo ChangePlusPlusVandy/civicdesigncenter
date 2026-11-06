@@ -13,7 +13,7 @@ const participant = "6f1c2a8e-3b4d-4e5f-8a9b-0c1d2e3f4a5b";
 // A valid player event; pass overrides for the field under test
 const event = (overrides: Record<string, unknown> = {}) => ({
   type: "auction.bid_changed",
-  ts: new Date(),
+  server_timestamp: new Date(),
   game_id: 1,
   round: 1,
   phase: "auction",

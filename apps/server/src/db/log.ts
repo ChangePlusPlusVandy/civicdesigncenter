@@ -28,7 +28,7 @@ export const outcomes = outcomeEnum.enumValues;
 export const EventEnvelope = z
   .object({
     type: z.enum(eventTypes), // LC2: key
-    ts: z.date(), // LC2: time -> events.server_timestamp
+    server_timestamp: z.date(), // LC2: time
     game_id: z.number().int(), // LC2: gameCode -> games.game_id
     round: z.number().int().positive(), // events.round, at least 1
     phase: Phase, // events.phase
