@@ -1,11 +1,11 @@
 # Event log
 
-| Field         | Value                                                                                                            |
-| ------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Status        | Draft (frozen with the Nashville spec, #27)                                                                      |
-| Applies to    | `packages/engine` event types, `events` table, event catalog (`catalog.ts`), data export (#48)                   |
-| Last reviewed | 2026-11-02                                                                                                       |
-| Related       | #48, #64, #65, PR #70, PR #73, PR #74, [`ARCHITECTURE.md`](ARCHITECTURE.md) §4, [`GAME-RULES.md`](GAME-RULES.md) |
+| Field         | Value                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Status        | Draft (frozen with the Nashville spec, #27)                                                                        |
+| Applies to    | `packages/engine` event types, `events` table, event catalog (`packages/shared/src/catalog.ts`), data export (#48) |
+| Last reviewed | 2026-11-06                                                                                                         |
+| Related       | #48, #64, #65, PR #70, PR #73, PR #74, [`ARCHITECTURE.md`](ARCHITECTURE.md) §4, [`GAME-RULES.md`](GAME-RULES.md)   |
 
 ## 1. Scope
 
@@ -90,19 +90,24 @@ scenario or the game state.
 | `game.ended`              | teacher, system | `endGame`, or RULE-090 at round end        | `reason` (§4), `at`                                                                                                       | (new)                | In review (PR #74) |
 | `phase.advanced`          | teacher         | Any phase transition                       | `from`, `to` (§4 phases), `round` (round in effect after the change), `at`                                                | (new)                | In review (PR #74) |
 | `round.ended`             | system          | Leaving `resolve`                          | `round`                                                                                                                   | (new)                | In review (PR #74) |
-| `round.snapshot`          | system          | End of every round (snapshot row)          | Full state                                                                                                                | (end-of-round state) | Planned (#64)      |
+| `round.snapshot`          | system          | End of every round (snapshot row)          | Full state: `teams`, `ownedFactories`, `publicFactories` (arrays of records)                                              | (end-of-round state) | Planned (#64)      |
 | `round.city_stats`        | system          | Per city, during resolution                | `team`, `before`, `after` (each `{ resources, population, happiness, pollution }`), `happinessFactor`, `populationFactor` | `cityStatUpdate`     | Planned (#29)      |
 | `production.building_ran` | system          | Per running building, during resolution    | `team`, `building`, `inputs`, `outputs`, `natureBefore`, `natureAfter`, `notes`, `skipReason` (optional)                  | `buildingRun`        | Planned (#23)      |
-| `auction.lot_added`       | system          | Lot drawn into the auction                 | `lot`, `buildingType`, `resource`, `rng` (state after the draw)                                                           | `addBuilding`        | Planned (#22)      |
+| `auction.lot_added`       | system          | Lot drawn into the auction                 | `lot`, `buildingType`, `resource`, `rng` (state after the draw), `location` (optional)                                    | `addBuilding`        | Planned (#22)      |
 | `auction.bid_changed`     | player          | City changes a sealed bid                  | `lot`, `resource`, `before`, `after`, `delta`, `requested`                                                                | `BidAct`             | Planned (#22)      |
 | `auction.ready_set`       | player          | City sets or clears ready                  | `ready`, `before`                                                                                                         | `bidCommit`          | Planned (#22)      |
 | `auction.lot_won`         | system          | Lot resolves to a winner                   | `lot`, `team`, `resource`, `amount`, `resourcesBefore`, `resourcesAfter`                                                  | `BuildingAcquire`    | Planned (#22)      |
 | `auction.lot_unsold`      | system          | Lot ties or has no bids                    | `lot`, `tiedTeams`, `reason` (§4)                                                                                         | (new)                | Planned (#22)      |
-| `building.placed`         | player          | Building placed on a tile                  | `building`, `cell` (`{ x, y }`), `adjacency`                                                                              | `buildingPlace`      | Planned (#20)      |
+| `building.placed`         | player          | Building placed on a tile                  | `building`, `cell` (`{ x, y }`), `adjacency` (array of `{ building, cell }`, empty when none)                             | `buildingPlace`      | Planned (#20)      |
 | `building.removed`        | player          | Building removed                           | `building`, `cell`                                                                                                        | `removeBuilding`     | Planned (#20)      |
 | `building.toggled`        | player          | Running state changed or attempted         | `building`, `before`, `after`, `applied`                                                                                  | `buildingToggle`     | Planned (#23)      |
 | `trade.gift_sent`         | player          | Gift applied or attempted (running phases) | `fromTeam`, `toTeam` (city ids), `resource`, `amount`, `fromBefore`, `toBefore`                                           | `tradeResource`      | In review (PR #73) |
-| `teacher.*`               | teacher         | Moderation                                 | Per action: team assignment, kick, rename, seat reset, room lock                                                          | (new)                | Planned (#36)      |
+| `teacher.team_assigned`   | teacher         | Player moved to, from or between teams     | `participant`, `before`, `after` (city ids; null = no team)                                                               | (new)                | Planned (#36)      |
+| `teacher.player_kicked`   | teacher         | Player kicked                              | `participant`, `team` (city id; null = no team)                                                                           | (new)                | Planned (#36)      |
+| `teacher.player_renamed`  | teacher         | Player renamed                             | `participant`                                                                                                             | (new)                | Planned (#36)      |
+| `teacher.team_renamed`    | teacher         | Team renamed                               | `team`                                                                                                                    | (new)                | Planned (#36)      |
+| `teacher.seat_reset`      | teacher         | Seat reset                                 | `participant`                                                                                                             | (new)                | Planned (#36)      |
+| `teacher.room_locked`     | teacher         | Room locked or unlocked                    | `before`, `after` (`games.locked`)                                                                                        | (new)                | Planned (#36)      |
 
 - EVT-020: `auction.bid_changed.delta` MUST equal `after − before`.
   `requested` is the bid the player asked for; on a rejected attempt
@@ -112,6 +117,45 @@ scenario or the game state.
   when rejected. A gift has no trade id.
 - EVT-022: A skipped building (`skipReason` set) has empty `inputs` and
   `outputs` and `natureAfter = natureBefore`.
+- EVT-023: On a rejected event nothing changes: `before` equals `after` when
+  both are present, and a rejected `auction.ready_set` has `ready = before`.
+- EVT-024: `building.toggled.applied` MUST agree with `outcome`: `true` when
+  applied and `false` when rejected. `after` is the state after the action, so
+  the requested state is always the opposite of `before`.
+- EVT-025: Who acted is fixed by `actor_type`: `player` events set only
+  `participant_id`, `teacher` events set only `teacher_id`, and `system` events
+  set neither. The `events` table enforces this with a `CHECK` constraint.
+- EVT-026: Typed names MUST NOT be logged, so `teacher.player_renamed` and
+  `teacher.team_renamed` carry no before or after name (EVT-008). Token hashes
+  are never logged.
+- EVT-027: The catalog validates payload shape only, not game rules, because
+  rejected attempts carry invalid values and must still be logged.
+
+### 5.1 Shared payload shapes
+
+| Shape           | Definition                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------ |
+| Cell            | `{ x, y }`, integers                                                                       |
+| Resources       | Map of resource name to integer amount                                                     |
+| City stats      | `{ resources, population, happiness, pollution }`; `population` integer                    |
+| RNG values      | `seed` and `rng` are integers from 0 to 4294967295 (uint32)                                |
+| `at`            | Non-negative integer, epoch milliseconds                                                   |
+| `round`         | Integer ≥ 1                                                                                |
+| Building fields | `lot` and `building` hold the same building id; events never copy a full building document |
+
+### 5.2 Provisional shapes
+
+These payloads are implemented in the catalog but may change once the game
+design settles them.
+
+| Field                                                  | Current shape       | Would change if                                                                                     |
+| ------------------------------------------------------ | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `auction.lot_added.location`                           | Any value, optional | The real LC2 shape is confirmed                                                                     |
+| `building.placed.adjacency`                            | Array of neighbours | Adjacency is defined as a bonus number                                                              |
+| `round.city_stats.happinessFactor`, `populationFactor` | Single number       | A factor is a breakdown of several causes                                                           |
+| `round.snapshot` records                               | Loose records       | The game state shape is fixed                                                                       |
+| `teacher.team_renamed`                                 | `team` only         | Names come from a fixed list, so they are safe to log                                               |
+| `auction.ready_set.ready`                              | Boolean             | LC2 `commitState` turns out to be a string; the server maps it to a boolean when building the event |
 
 ## 6. LC2 parity
 
@@ -131,3 +175,35 @@ collection (names only; no values are copied into this repository).
   pseudonymous `participant_id`s only (EVT-008).
 - LC2's `tradeResource.readBy` has no equivalent; notification read state is
   not logged (EVT-002).
+- LC2's `buildingResource` is not a live key, so it has no event type.
+
+### 6.1 Field mapping
+
+`localName` is dropped everywhere (EVT-008). Fields not listed have no LC2
+source and are computed by the server or engine: `requested`, `ready_set.before`,
+`buildingType`, `lot_added.resource`, `rng`, `adjacency`, `removed.cell` (read
+from map state), `inputs`, `outputs`, `skipReason`, `city_stats.before` and the
+city stats factors.
+
+| LC2 key           | LC2 field                                   | Log field                                                |
+| ----------------- | ------------------------------------------- | -------------------------------------------------------- |
+| `BidAct`          | `buildingId`, `bidKind`                     | `lot`, `resource`                                        |
+| `BidAct`          | `oldVal`, `newVal`, `change`                | `before`, `after`, `delta`                               |
+| `BidAct`          | `baseId`                                    | Envelope `team_id`                                       |
+| `bidCommit`       | `commitState`, `baseId`                     | `ready`, envelope `team_id`                              |
+| `addBuilding`     | `buildingId`, `location`                    | `lot`, `location`                                        |
+| `addBuilding`     | `userId`                                    | Envelope `participant_id` or `teacher_id`                |
+| `BuildingAcquire` | `buildingId`, `baseId`, `bidKind`, `bidVal` | `lot`, `team`, `resource`, `amount`                      |
+| `BuildingAcquire` | `oldRes.*`, `newRes.*`                      | `resourcesBefore`, `resourcesAfter`                      |
+| `buildingPlace`   | `building._id`, `newMap` tile x and y       | `building`, `cell`                                       |
+| `removeBuilding`  | `buildingId`                                | `building`                                               |
+| `buildingToggle`  | `buildingId`, `pastStatus`, `newStatus`     | `building`, `before`, `after`                            |
+| `buildingToggle`  | `changed`, `baseId`                         | `applied`, envelope `team_id`                            |
+| `tradeResource`   | `from`, `to` (full city documents)          | `fromTeam`, `toTeam` (city ids)                          |
+| `tradeResource`   | `resource`, `amount`                        | `resource`, `amount`                                     |
+| `tradeResource`   | `from.res[resource]`, `to.res[resource]`    | `fromBefore`, `toBefore`                                 |
+| `tradeResource`   | `success`                                   | Envelope `outcome` and `error_code`                      |
+| `buildingRun`     | `building._id`, `game.notes`                | `building`, `notes`                                      |
+| `buildingRun`     | `game.pollution` before and after           | `natureBefore`, `natureAfter`                            |
+| `buildingRun`     | `game.res.*`                                | `inputs`, `outputs` and `round.snapshot`                 |
+| `cityStatUpdate`  | `newRes.*`, `newPop`, `happiness`           | `after.resources`, `after.population`, `after.happiness` |
