@@ -25,6 +25,9 @@ export interface SavedGame {
   contributions: Record<string, Contribution>;
   seq: number;
   lastActivity: number;
+  // Recent clientActionIds and the version each produced, so a client that
+  // retries after a restart doesn't repeat its action.
+  seen?: [string, number][];
 }
 
 export interface GameStore {

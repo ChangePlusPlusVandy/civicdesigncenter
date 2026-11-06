@@ -19,7 +19,7 @@ import {
 } from "@cs/idle";
 import { createApp } from "../app.ts";
 import { Sandbox } from "./index.ts";
-import { SqlStore, type SavedGame } from "./store.ts";
+import { MemoryStore, SqlStore, type SavedGame } from "./store.ts";
 
 const cleanup: (() => Promise<void> | void)[] = [];
 afterEach(async () => {
@@ -78,6 +78,49 @@ describe("SqlStore", () => {
   });
 });
 
+// Fails the first write, then works, recording each batch it was given.
+class FlakyStore extends MemoryStore {
+  batches: number[] = [];
+  private failed = false;
+
+  override async appendEvents(code: string, rows: LoggedEvent[]) {
+    this.batches.push(rows.length);
+    if (!this.failed) {
+      this.failed = true;
+      throw new Error("connection reset");
+    }
+    await super.appendEvents(code, rows);
+  }
+}
+
+describe("saving", () => {
+  it("keeps log rows a failed save didn't write, and writes in batches", async () => {
+    const store = new FlakyStore();
+    const sandbox = new Sandbox({ store, tickMs: 0 });
+    cleanup.push(() => sandbox.close());
+    const room = sandbox.create(2);
+    for (let i = 0; i < 2500; i++) room.reject({ kind: "teacher" });
+
+    const quiet = console.error;
+    console.error = () => {};
+    try {
+      await sandbox.save();
+    } finally {
+      console.error = quiet;
+    }
+    expect(await store.loadEvents(room.code)).toEqual([]);
+
+    room.reject({ kind: "teacher" }); // logged while the database was down
+    await sandbox.save();
+    const saved = await store.loadEvents(room.code);
+    expect(saved).toHaveLength(2501);
+    expect(saved.map((row) => row.seq)).toEqual(
+      Array.from({ length: 2501 }, (_, i) => i + 1),
+    );
+    expect(Math.max(...store.batches)).toBeLessThanOrEqual(1000);
+  });
+});
+
 async function serve(sandbox: Sandbox) {
   const server: Server = createServer(createApp({ sandbox }));
   sandbox.attach(server);
@@ -109,13 +152,18 @@ async function connect(base: string, code: string, token: string) {
     }
     throw new Error("timed out");
   };
-  let n = 0;
-  const act = (intent: ClientIntent): Promise<Ack> =>
+  const act = (
+    intent: ClientIntent,
+    clientActionId = `a${++actions}`,
+  ): Promise<Ack> =>
     socket
       .timeout(2000)
-      .emitWithAck(CLIENT_EVENTS.action, { clientActionId: `a${++n}`, intent });
+      .emitWithAck(CLIENT_EVENTS.action, { clientActionId, intent });
   return { socket, waitFor, act };
 }
+
+// Unique across connections, like the real client's random ids.
+let actions = 0;
 
 describe("restarting the server", () => {
   it("brings games back, paused, with tokens and the log intact", async () => {
@@ -143,12 +191,11 @@ describe("restarting the server", () => {
     await teacher.act({ type: "start" });
     const student = await connect(base, code, ana.token);
     await student.waitFor((p) => p.phase === "running");
-    expect(
-      await student.act({
-        type: "build",
-        payload: { kind: "farm", x: 6, y: 2 },
-      }),
-    ).toMatchObject({ ok: true });
+    const farm: ClientIntent = {
+      type: "build",
+      payload: { kind: "farm", x: 6, y: 2 },
+    };
+    expect(await student.act(farm, "farm-1")).toMatchObject({ ok: true });
     await first.close();
 
     // Raw tokens never reach the database.
@@ -170,6 +217,11 @@ describe("restarting the server", () => {
     expect(restored.myCity?.buildings.some((b) => b.kind === "farm")).toBe(
       true,
     );
+    // A retry that was waiting when the server went down isn't run twice.
+    expect(await back.act(farm, "farm-1")).toMatchObject({
+      ok: true,
+      duplicate: true,
+    });
 
     const teacherAgain = await connect(base, code, teacherToken);
     expect(await teacherAgain.act({ type: "resume" })).toMatchObject({
@@ -191,5 +243,6 @@ describe("restarting the server", () => {
       ]),
     );
     expect(new Set(log.map((row) => row.seq)).size).toBe(log.length);
+    expect(types.filter((type) => type === "building.built")).toHaveLength(1);
   });
 });

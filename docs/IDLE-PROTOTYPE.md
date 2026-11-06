@@ -119,12 +119,20 @@ e2e/                      Playwright: real browsers, real server.
 
 The server is authoritative, as in `ARCHITECTURE.md`:
 
-1. A client sends `{ clientActionId, intent }` and gets an ack.
+1. A client sends `{ clientActionId, intent }` and gets an ack. The server
+   validates every message with zod before the engine sees it (ARCH-081):
+   anything malformed is rejected as `BAD_REQUEST` and logged as
+   `action.invalid` without what was sent. Messages over 16 KB close the
+   connection. An error inside the engine fails that action with `INTERNAL`
+   instead of stopping the server.
 2. Every change broadcasts a full, versioned projection per audience:
    - **Player:** their own city in full, other cities' public faces only.
    - **Teacher:** everything, plus the roster.
    - **Projector:** public information only.
-3. Retried actions are deduplicated.
+3. Retried actions are deduplicated. The client keeps one `clientActionId`
+   per action until the server answers, so pressing "Try again" after a
+   timeout can't run it twice. The server remembers recent ids across
+   restarts.
 4. Rejected attempts are logged with their error code, like accepted ones.
 
 ## Screens
@@ -149,10 +157,13 @@ reports itself as a Mac.
 Games are saved to `sandbox_games` (one snapshot per game) and
 `sandbox_events` (the append-only research log): Postgres (Neon) when
 `DATABASE_URL` is set, otherwise PGlite in `SANDBOX_PGLITE_DIR`
-(`./.pglite-sandbox`). Saves happen at most once a second per changed game
-and on shutdown. On startup, every game touched in the last 12 hours comes
-back; a game that was running comes back paused for the teacher to resume.
-Tokens are stored only as SHA-256 hashes.
+(`./.pglite-sandbox`, relative to where the server starts). Production
+needs `DATABASE_URL` or an explicit `SANDBOX_PGLITE_DIR`; without either, the
+server exits with a message. Saves happen at most once a second per changed
+game and on shutdown, in batches of 1,000 log rows. A failed save keeps its
+rows and retries them on the next save. On startup, every game touched in the
+last 12 hours comes back; a game that was running comes back paused for the
+teacher to resume. Tokens are stored only as SHA-256 hashes.
 
 The drivers match the main schema PR (#70); the tables are prefixed
 `sandbox_` and created idempotently, so they don't touch that schema or its

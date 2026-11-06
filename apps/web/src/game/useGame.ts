@@ -11,6 +11,7 @@ import {
   type Projection,
   type SocketAuth,
 } from "@cs/idle";
+import { ActionIds } from "./actionIds";
 import { API_URL } from "./api";
 
 export type ConnectionStatus =
@@ -62,6 +63,8 @@ export function useGame(auth: SocketAuth | null): GameConnection {
   const authKey = auth ? JSON.stringify(auth) : null;
   const [live, setLive] = useState<Live | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const idsRef = useRef<ActionIds | null>(null);
+  idsRef.current ??= new ActionIds(actionId);
 
   useEffect(() => {
     if (!authKey) return;
@@ -137,8 +140,15 @@ export function useGame(auth: SocketAuth | null): GameConnection {
   );
 
   const act = useCallback(
-    (intent: ClientIntent) =>
-      send(CLIENT_EVENTS.action, { clientActionId: actionId(), intent }),
+    async (intent: ClientIntent) => {
+      const ids = idsRef.current as ActionIds;
+      const ack = await send(CLIENT_EVENTS.action, {
+        clientActionId: ids.take(intent),
+        intent,
+      });
+      ids.settle(intent, ack);
+      return ack;
+    },
     [send],
   );
   const admin = useCallback(

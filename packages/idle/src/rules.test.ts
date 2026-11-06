@@ -464,3 +464,61 @@ describe("reflections", () => {
     ).toEqual(["Ana"]);
   });
 });
+
+// The server validates messages first (ARCH-081); the engine still refuses
+// malformed input instead of throwing, in case anything gets past that.
+describe("malformed intents", () => {
+  const raw = (intent: unknown) => intent as Intent;
+
+  it("rejects a player action with no payload", () => {
+    const state = running();
+    for (const type of ["upgrade", "demolish", "toggle", "vote", "reflect"]) {
+      expect(errorOf(state, green, raw({ type }))).toBe("BAD_REQUEST");
+    }
+  });
+
+  it("doesn't treat inherited names as actions or cities", () => {
+    const state = rich(running());
+    for (const type of ["toString", "__proto__", "constructor"]) {
+      expect(errorOf(state, green, raw({ type, payload: {} }))).toBe(
+        "NOT_ALLOWED",
+      );
+    }
+    expect(
+      errorOf(
+        state,
+        green,
+        raw({
+          type: "proposeTrade",
+          payload: { to: "__proto__", give: { wood: 1 }, get: {} },
+        }),
+      ),
+    ).toBe("BAD_REQUEST");
+    expect(state.offers).toEqual([]);
+  });
+
+  it("rejects inherited names in teacher actions", () => {
+    const state = running();
+    expect(
+      errorOf(
+        state,
+        teacher,
+        raw({ type: "startMeeting", payload: { policyIds: ["toString"] } }),
+      ),
+    ).toBe("BAD_REQUEST");
+    expect(
+      errorOf(
+        state,
+        teacher,
+        raw({ type: "startMeeting", payload: { policyIds: 3 } }),
+      ),
+    ).toBe("BAD_REQUEST");
+    expect(
+      errorOf(
+        state,
+        teacher,
+        raw({ type: "triggerEvent", payload: { kind: "constructor" } }),
+      ),
+    ).toBe("BAD_REQUEST");
+  });
+});

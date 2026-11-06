@@ -25,7 +25,7 @@ function csv(header: string[], rows: Cell[][]): string {
     // Quote anything with commas, quotes or newlines; neutralise leading
     // characters spreadsheets would run as formulas.
     const safe =
-      typeof cell === "string" && /^[=+\-@]/.test(text) ? `'${text}` : text;
+      typeof cell === "string" && /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
     return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
   return (

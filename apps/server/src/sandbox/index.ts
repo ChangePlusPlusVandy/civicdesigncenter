@@ -12,8 +12,6 @@ import {
   SANDBOX_NAMESPACE,
   SERVER_EVENTS,
   type Ack,
-  type ActionMessage,
-  type AdminMessage,
   type CreateGameResponse,
   type GameInfoResponse,
   type JoinResponse,
@@ -24,11 +22,16 @@ import { normalizeRoomCode } from "@cs/shared";
 import { GameRoom, type Identity } from "./room.ts";
 import { EXPORT_KINDS, exportCsv, type ExportKind } from "./export.ts";
 import { MemoryStore, type GameStore } from "./store.ts";
+import { parseAction, parseAdmin } from "./validate.ts";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const IDLE_ROOM_MS = 12 * 60 * 60 * 1000;
 const SAVE_EVERY_MS = 1000;
 const RESTORED_LOG = 5000;
+// Rows per INSERT: two parameters each, well under Postgres's 65,535.
+const SAVE_BATCH = 1000;
+// The largest real message is a reflection of a few hundred characters.
+const MAX_MESSAGE_BYTES = 16 * 1024;
 
 export interface SandboxOptions {
   tickMs?: number;
@@ -83,8 +86,16 @@ export class Sandbox {
         if (!unsaved) continue;
         try {
           await this.store.saveGame(unsaved.game);
-          await this.store.appendEvents(room.code, unsaved.events);
+          for (let i = 0; i < unsaved.events.length; i += SAVE_BATCH) {
+            await this.store.appendEvents(
+              room.code,
+              unsaved.events.slice(i, i + SAVE_BATCH),
+            );
+          }
         } catch (error) {
+          // Retried on the next save. Rows already written are skipped then
+          // (ON CONFLICT DO NOTHING), so nothing is lost or doubled.
+          room.restoreUnsaved(unsaved.events);
           console.error(`Couldn't save game ${room.code}`, error);
         }
       }
@@ -276,6 +287,8 @@ export class Sandbox {
       cors: { origin: false },
       // Projections repeat a lot between ticks, so they compress well.
       perMessageDeflate: { threshold: 1024 },
+      // Caps what one client can send, so junk can't fill memory.
+      maxHttpBufferSize: MAX_MESSAGE_BYTES,
     });
     const nsp = this.io.of(SANDBOX_NAMESPACE);
 
@@ -301,44 +314,39 @@ export class Sandbox {
         room.visibleLog(identity).map((event) => withName(room, event)),
       );
 
-      socket.on(
-        CLIENT_EVENTS.action,
-        (message: ActionMessage, ack?: (reply: Ack) => void) => {
+      socket.on(CLIENT_EVENTS.action, (raw: unknown, ack?: unknown) => {
+        const reply = guarded(room, () => {
           const current = currentIdentity(room, identity);
-          let reply: Ack;
           if (!current) {
-            reply = {
+            return {
               ok: false,
               code: "FORBIDDEN",
               message: "You were removed from this game.",
             };
-          } else if (!isActionMessage(message)) {
-            reply = {
-              ok: false,
-              code: "BAD_REQUEST",
-              message: "Malformed action.",
-            };
-          } else {
-            reply = room.act(current, message.clientActionId, message.intent);
           }
-          if (typeof ack === "function") ack(reply);
-        },
-      );
+          const message = parseAction(raw);
+          if (!message) return room.reject(current);
+          return room.act(current, message.clientActionId, message.intent);
+        });
+        if (typeof ack === "function") ack(reply);
+      });
 
-      socket.on(
-        CLIENT_EVENTS.admin,
-        (message: AdminMessage, ack?: (reply: Ack) => void) => {
-          const reply: Ack =
-            identity.kind === "teacher"
-              ? room.admin(message)
-              : {
-                  ok: false,
-                  code: "FORBIDDEN",
-                  message: "Only the teacher can do that.",
-                };
-          if (typeof ack === "function") ack(reply);
-        },
-      );
+      socket.on(CLIENT_EVENTS.admin, (raw: unknown, ack?: unknown) => {
+        const reply = guarded(room, (): Ack => {
+          if (identity.kind !== "teacher") {
+            return {
+              ok: false,
+              code: "FORBIDDEN",
+              message: "Only the teacher can do that.",
+            };
+          }
+          const message = parseAdmin(raw);
+          return message
+            ? room.admin(message)
+            : { ok: false, code: "BAD_REQUEST", message: "Malformed change." };
+        });
+        if (typeof ack === "function") ack(reply);
+      });
     });
 
     return this.io;
@@ -390,16 +398,13 @@ function canSee(identity: Identity, event: LoggedEvent): boolean {
   );
 }
 
-function isActionMessage(value: unknown): value is ActionMessage {
-  const message = value as ActionMessage | null;
-  return (
-    typeof message === "object" &&
-    message !== null &&
-    typeof message.clientActionId === "string" &&
-    message.clientActionId.length > 0 &&
-    message.clientActionId.length <= 64 &&
-    typeof message.intent === "object" &&
-    message.intent !== null &&
-    typeof message.intent.type === "string"
-  );
+// Socket.IO doesn't catch errors thrown in handlers, so one would end the
+// process and every class's game. A bug fails just that action instead.
+function guarded(room: GameRoom, handle: () => Ack): Ack {
+  try {
+    return handle();
+  } catch (error) {
+    console.error(`Action failed in game ${room.code}`, error);
+    return { ok: false, code: "INTERNAL", message: "Something went wrong." };
+  }
 }

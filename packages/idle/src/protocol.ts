@@ -25,7 +25,7 @@ export type Ack =
   | { ok: true; version: number; duplicate?: boolean }
   | {
       ok: false;
-      code: ErrorCode | "FORBIDDEN" | "NO_GAME" | "OFFLINE";
+      code: ErrorCode | "FORBIDDEN" | "NO_GAME" | "OFFLINE" | "INTERNAL";
       message: string;
     };
 

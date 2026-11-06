@@ -109,6 +109,9 @@ export class GameRoom {
       for (const [id, counts] of Object.entries(saved.contributions)) {
         this.contributions.set(id, counts);
       }
+      // Older saves have no retry keys.
+      for (const [key, version] of saved.seen ?? [])
+        this.seen.set(key, version);
       this.log.push(...(options.restore?.log ?? []));
       this.dirty = false;
       this.resumeAfterRestart();
@@ -210,14 +213,7 @@ export class GameRoom {
     if (earlier !== undefined)
       return { ok: true, version: earlier, duplicate: true };
 
-    const actor: Actor =
-      identity.kind === "player"
-        ? {
-            kind: "player",
-            cityId: identity.player.cityId,
-            participantId: identity.player.id,
-          }
-        : { kind: "teacher" };
+    const actor = actorOf(identity);
     const participantId =
       identity.kind === "player" ? identity.player.id : undefined;
     const result = reduce(this.state, actor, intent);
@@ -251,6 +247,32 @@ export class GameRoom {
     return { ok: true, version: this.version };
   }
 
+  // A message that didn't parse (ARCH-081). Logged as an attempt (EVT-003)
+  // without anything the client sent, so junk can't fill the log.
+  reject(identity: Identity): Ack {
+    const reply: Ack = {
+      ok: false,
+      code: "BAD_REQUEST",
+      message: "Malformed action.",
+    };
+    if (identity.kind === "projector") return reply;
+    this.lastActivity = Date.now();
+    const actor = actorOf(identity);
+    this.record(
+      [
+        {
+          type: "action.invalid",
+          city: actor.kind === "player" ? actor.cityId : undefined,
+          payload: {},
+        },
+      ],
+      actor.kind,
+      identity.kind === "player" ? identity.player.id : undefined,
+      reply.code,
+    );
+    return reply;
+  }
+
   admin(message: AdminMessage): Ack {
     const player = this.playerById(message.playerId);
     if (!player)
@@ -260,8 +282,10 @@ export class GameRoom {
         return { ok: false, code: "BAD_REQUEST", message: "No such city." };
       }
       player.cityId = message.cityId;
-    } else {
+    } else if (message.type === "removePlayer") {
       this.players.delete(player.tokenHash);
+    } else {
+      return { ok: false, code: "BAD_REQUEST", message: "Unknown change." };
     }
     this.version += 1;
     this.changed(
@@ -371,6 +395,7 @@ export class GameRoom {
       contributions: Object.fromEntries(this.contributions),
       seq: this.seq,
       lastActivity: this.lastActivity,
+      seen: [...this.seen],
     };
   }
 
@@ -379,6 +404,13 @@ export class GameRoom {
     if (!this.dirty) return null;
     this.dirty = false;
     return { game: this.snapshot(), events: this.unsaved.splice(0) };
+  }
+
+  // Puts back rows a failed save took, ahead of anything logged since, so
+  // the next save retries them.
+  restoreUnsaved(events: LoggedEvent[]): void {
+    this.unsaved.unshift(...events);
+    this.dirty = true;
   }
 
   private record(
@@ -418,4 +450,14 @@ export class GameRoom {
     this.dirty = true;
     this.onChange?.(this, events);
   }
+}
+
+function actorOf(identity: Identity & { kind: "teacher" | "player" }): Actor {
+  return identity.kind === "player"
+    ? {
+        kind: "player",
+        cityId: identity.player.cityId,
+        participantId: identity.player.id,
+      }
+    : { kind: "teacher" };
 }

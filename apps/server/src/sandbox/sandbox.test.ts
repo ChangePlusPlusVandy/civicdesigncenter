@@ -383,6 +383,109 @@ describe("sandbox over sockets", () => {
     await ana.waitFor((p) => p.myCity?.goods.wood === 19);
   });
 
+  it("runs an action once when the ack was lost and the client retries", async () => {
+    const h = await start();
+    const { code, teacherToken, teacher, students, joined } = await classroom(
+      h,
+      ["Ana", "Ben"],
+    );
+    await teacher.act({ type: "start" });
+    const ana = students[0] as Client;
+    await ana.waitFor((p) => p.phase === "running");
+    const [x, y] = { red: [3, 3], green: [9, 2] }[
+      joined[0]?.cityId as "red" | "green"
+    ] ?? [0, 0];
+    const intent: ClientIntent = {
+      type: "build",
+      payload: { kind: "farm", x: x ?? 0, y: y ?? 0 },
+    };
+
+    // The first attempt arrives, but its ack never reaches the student…
+    ana.socket.emit(CLIENT_EVENTS.action, { clientActionId: "lost", intent });
+    await ana.waitFor((p) => (p.myCity?.buildings.length ?? 0) > 1);
+    // …so they press "Try again", which sends the same id.
+    expect(await ana.act(intent, "lost")).toMatchObject({
+      ok: true,
+      duplicate: true,
+    });
+
+    const log = (await (
+      await fetch(`${h.baseUrl}/api/sandbox/games/${code}/log`, {
+        headers: { authorization: `Bearer ${teacherToken}` },
+      })
+    ).json()) as LoggedEvent[];
+    expect(log.filter((row) => row.type === "building.built")).toHaveLength(1);
+  });
+
+  it("rejects malformed messages without crashing or storing them", async () => {
+    const h = await start();
+    const { code, teacherToken, teacher, students, joined } = await classroom(
+      h,
+      ["Ana", "Ben"],
+    );
+    await teacher.act({ type: "start" });
+    const ana = students[0] as Client;
+    const ben = students[1] as Client;
+    await ana.waitFor((p) => p.phase === "running");
+    const raw = (client: Client, event: string, message: unknown) =>
+      client.socket.timeout(2000).emitWithAck(event, message) as Promise<Ack>;
+    const bad = { ok: false, code: "BAD_REQUEST" };
+
+    // Each of these used to throw inside the handler and end the process.
+    for (const intent of [
+      { type: "upgrade" },
+      { type: "toString" },
+      { type: "__proto__", payload: {} },
+      { type: "proposeTrade", payload: { to: "__proto__", give: {}, get: {} } },
+      { type: "marketBuy", payload: { good: "food", amount: 1, junk: "x" } },
+    ]) {
+      expect(
+        await raw(ana, CLIENT_EVENTS.action, { clientActionId: "x", intent }),
+      ).toMatchObject(bad);
+    }
+    expect(await raw(ana, CLIENT_EVENTS.action, null)).toMatchObject(bad);
+
+    // A typo'd admin change doesn't remove anyone.
+    const benId = joined[1]?.playerId;
+    expect(
+      await raw(teacher, CLIENT_EVENTS.admin, {
+        type: "renamePlayer",
+        playerId: benId,
+      }),
+    ).toMatchObject(bad);
+    expect(teacher.state.roster?.some((p) => p.playerId === benId)).toBe(true);
+
+    // Anything over the size limit closes that one connection.
+    const closed = new Promise((resolve) =>
+      ana.socket.once("disconnect", resolve),
+    );
+    ana.socket.emit(CLIENT_EVENTS.action, {
+      clientActionId: "big",
+      intent: { type: "x", junk: "j".repeat(64 * 1024) },
+    });
+    await closed;
+
+    // The server is still up for everyone else.
+    expect(
+      await ben.act({
+        type: "marketSell",
+        payload: { good: "wood", amount: 1 },
+      }),
+    ).toMatchObject({ ok: true });
+
+    const rows = (await (
+      await fetch(`${h.baseUrl}/api/sandbox/games/${code}/log`, {
+        headers: { authorization: `Bearer ${teacherToken}` },
+      })
+    ).json()) as LoggedEvent[];
+    const invalid = rows.filter((row) => row.type === "action.invalid");
+    expect(invalid).toHaveLength(6);
+    expect(invalid.every((row) => row.errorCode === "BAD_REQUEST")).toBe(true);
+    const dump = JSON.stringify(rows);
+    expect(dump).not.toContain("junk");
+    expect(dump).not.toContain("__proto__");
+  });
+
   it("picks up where it left off after a reconnect", async () => {
     const h = await start();
     const { code, teacher, students, joined } = await classroom(h, [

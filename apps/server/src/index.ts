@@ -20,7 +20,19 @@ const webDist =
   fileURLToPath(new URL("../../web/dist", import.meta.url));
 
 // Games are saved to Postgres when DATABASE_URL is set (Neon in staging),
-// otherwise to a local PGlite folder, and come back after a restart.
+// otherwise to a local PGlite folder, and come back after a restart. The
+// container's default folder isn't writable, so production needs a database
+// or a folder chosen on purpose (the e2e tests use one).
+if (
+  isProduction &&
+  !process.env.DATABASE_URL &&
+  !process.env.SANDBOX_PGLITE_DIR
+) {
+  console.error(
+    "Set DATABASE_URL (or SANDBOX_PGLITE_DIR to a writable folder) when NODE_ENV=production.",
+  );
+  process.exit(1);
+}
 const sandbox = await Sandbox.open({
   store: await openStore(
     process.env.DATABASE_URL || undefined,

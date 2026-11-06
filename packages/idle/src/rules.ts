@@ -200,8 +200,12 @@ export function reduce(
 
   const city = state.cities[actor.cityId];
   if (!city) return fail("NOT_FOUND", "Your city isn't in this game.");
+  // Own keys only, so "toString" or "__proto__" isn't mistaken for an action.
+  if (!Object.hasOwn(PLAYER_INTENTS, intent.type))
+    return fail("NOT_ALLOWED", `Players can't ${intent.type}.`);
+  if (typeof intent.payload !== "object" || intent.payload === null)
+    return fail("BAD_REQUEST", "That action is missing its details.");
   const needed = PLAYER_INTENTS[intent.type as PlayerIntent["type"]];
-  if (!needed) return fail("NOT_ALLOWED", `Players can't ${intent.type}.`);
   if (!needed.includes(state.phase)) {
     const message =
       state.phase === "meeting"
@@ -460,7 +464,7 @@ function proposeTrade(
   payload: { to: CityId; give: Bundle; get: Bundle },
 ): ReduceResult {
   const { to, give, get } = payload ?? {};
-  if (!state.cities[to] || to === city.id)
+  if (!Object.hasOwn(state.cities, to) || !state.cities[to] || to === city.id)
     return fail("BAD_REQUEST", "Pick another city.");
   if (
     !isBundle(give) ||
@@ -710,11 +714,13 @@ function startMeeting(
   if (state.phase !== "running" && state.phase !== "paused") {
     return fail("WRONG_PHASE", "Start the game before calling a meeting.");
   }
-  const ids = [...new Set(policyIds ?? [])];
+  const ids = [...new Set(Array.isArray(policyIds) ? policyIds : [])];
   if (
     ids.length < 1 ||
     ids.length > 3 ||
-    ids.some((id) => !(id in POLICIES) || state.policies.includes(id))
+    ids.some(
+      (id) => !Object.hasOwn(POLICIES, id) || state.policies.includes(id),
+    )
   ) {
     return fail("BAD_REQUEST", "Pick 1 to 3 policies that haven't passed yet.");
   }
@@ -805,7 +811,8 @@ function triggerEvent(
   state: IdleState,
   kind: EventKind | undefined,
 ): ReduceResult {
-  if (!kind || !(kind in EVENTS)) return fail("BAD_REQUEST", "Pick an event.");
+  if (!kind || !Object.hasOwn(EVENTS, kind))
+    return fail("BAD_REQUEST", "Pick an event.");
   if (state.phase !== "running" && state.phase !== "paused") {
     return fail("WRONG_PHASE", "Events happen while the game is on.");
   }

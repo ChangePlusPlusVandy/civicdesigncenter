@@ -91,6 +91,8 @@ const COLORS: Record<CityId, string> = {
   yellow: "#e2ad2c",
 };
 
+export const CITY_IDS = Object.keys(COLORS) as CityId[];
+
 interface MapSpec {
   id: MapId;
   name: string;
