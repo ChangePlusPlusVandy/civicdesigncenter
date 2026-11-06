@@ -8,7 +8,7 @@ import {
   ParticipantId,
   type EventType,
   type EventPayload,
-} from "./catalog";
+} from "@cs/shared/catalog";
 import { actorTypeEnum, outcomeEnum } from "./drizzle-schema";
 
 // Event log: the envelope every row shares, and parseEvent, which validates envelope + payload together.
@@ -30,8 +30,8 @@ export const EventEnvelope = z
     type: z.enum(eventTypes), // LC2: key
     ts: z.date(), // LC2: time -> events.server_timestamp
     game_id: z.number().int(), // LC2: gameCode -> games.game_id
-    round: z.number().int().nonnegative(), // events.round
-    phase: Phase.nullable(), // events.phase, null outside a phase (lobby)
+    round: z.number().int().positive(), // events.round, at least 1
+    phase: Phase, // events.phase
     team_id: TeamId.nullable(), // LC2: baseId. null for game-wide events (phase.advanced, game.*, ...)
     participant_id: ParticipantId.nullable(), // LC2: userId. The student at the device; null for system / teacher events
     teacher_id: z.string().nullable(), // game_roles.user_id (Better Auth id, which is not a uuid)
@@ -43,11 +43,11 @@ export const EventEnvelope = z
   })
   .superRefine((e, ctx) => {
     // "Who": exactly the id that matches the actor
-    if (e.actor_type === "participant" && e.participant_id === null)
+    if (e.actor_type === "player" && e.participant_id === null)
       ctx.addIssue({
         code: "custom",
         path: ["participant_id"],
-        message: "participant events need participant_id",
+        message: "player events need participant_id",
       });
     if (e.actor_type === "teacher" && e.teacher_id === null)
       ctx.addIssue({
@@ -55,7 +55,7 @@ export const EventEnvelope = z
         path: ["teacher_id"],
         message: "teacher events need teacher_id",
       });
-    if (e.actor_type !== "participant" && e.participant_id !== null)
+    if (e.actor_type !== "player" && e.participant_id !== null)
       ctx.addIssue({
         code: "custom",
         path: ["participant_id"],

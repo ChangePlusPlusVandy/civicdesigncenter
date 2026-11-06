@@ -1,11 +1,11 @@
 // Seed data for local development: npm run db:seed
-// Run the migrations first (npm run db:push) so the tables exist.
+// Run the migrations first (npm run db:migrate) so the tables exist.
 // Wipes every game (cascades to teams, players, game_roles, snapshots, events) and inserts:
 //   - game 1 "LOBBY1": lobby, 2 teams, 3 players (one without a team yet), no events
 //   - game 2 "PLAY01": active in round 1, 3 teams, 6 players, snapshot at version 3 with matching events
 // seed(db) is exported so tests can run it on an in-memory database.
+// Refuses to run against a real database (DATABASE_URL set) unless SEED_ALLOW_REMOTE=1.
 
-import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import type * as dbModule from "./index";
@@ -17,6 +17,7 @@ import {
   snapshots,
   events,
 } from "./drizzle-schema";
+import { hashToken } from "./tokens";
 
 type Db = typeof dbModule.db;
 
@@ -25,10 +26,6 @@ type Game = typeof games.$inferSelect;
 type Team = typeof teams.$inferSelect;
 type Player = typeof players.$inferSelect;
 
-// Fake player tokens, only the hash is stored (same as the real join flow should do)
-const hashToken = (token: string) =>
-  createHash("sha256").update(token).digest("hex");
-
 export async function seed(db: Db) {
   await db.delete(games);
 
@@ -36,9 +33,14 @@ export async function seed(db: Db) {
   const [lobbyGame, activeGame] = (await db
     .insert(games)
     .values([
-      { scenario_id: 1, room_code: "LOBBY1", rng_seed: 12345, max_size: 8 },
       {
-        scenario_id: 1,
+        scenario_id: "lc2-default",
+        room_code: "LOBBY1",
+        rng_seed: 12345,
+        max_size: 8,
+      },
+      {
+        scenario_id: "lc2-default",
         room_code: "PLAY01",
         rng_seed: 67890,
         max_size: 12,
@@ -158,14 +160,14 @@ export async function seed(db: Db) {
     {
       game_id: lobbyGame.game_id,
       version: 0,
-      state: { round: 0, phase: null, teams: {} },
+      state: { round: 1, phase: "lobby", teams: {} },
     },
     {
       game_id: activeGame.game_id,
       version: 3,
       state: {
         round: 1,
-        phase: "bids",
+        phase: "auction",
         teams: {
           [red.team_id]: { cash: 1000, bid: 150 },
           [blue.team_id]: { cash: 1000, bid: 120 },
@@ -189,9 +191,9 @@ export async function seed(db: Db) {
   });
   const bidEvent = {
     game_id: activeGame.game_id,
-    actor_type: "participant",
+    actor_type: "player",
     round: 1,
-    phase: "bids",
+    phase: "auction",
     type: "auction.bid_changed",
   } as const;
   await db.insert(events).values([
@@ -236,6 +238,12 @@ if (
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
   const { db } = await import("./index");
+  // Checked after ./index loads the repo-root .env. Seeding deletes every game, so a real database needs an explicit opt-in
+  if (process.env.DATABASE_URL && process.env.SEED_ALLOW_REMOTE !== "1") {
+    throw new Error(
+      "Refusing to seed: DATABASE_URL is set. Unset it to seed local PGlite, or set SEED_ALLOW_REMOTE=1 to wipe that database.",
+    );
+  }
   seed(db)
     .catch((err) => {
       console.error("Seed failed:", err);

@@ -93,6 +93,11 @@ describe("games", () => {
     await expectDbError(makeGame(db, { rng_seed: null as any }), PG.NOT_NULL);
   });
 
+  test("rng_seed stores the largest uint32", async () => {
+    const game = await makeGame(db, { rng_seed: 0xffffffff });
+    expect(game.rng_seed).toBe(0xffffffff);
+  });
+
   test("game_status rejects values outside the enum", async () => {
     await expectDbError(
       makeGame(db, { game_status: "paused" as any }),
@@ -182,6 +187,14 @@ describe("players", () => {
     const game = await makeGame(db);
     const player = await makePlayer(db, game.game_id);
     expect(player.role).toBe("seat");
+  });
+
+  test("role rejects values outside the enum", async () => {
+    const game = await makeGame(db);
+    await expectDbError(
+      makePlayer(db, game.game_id, { role: "admin" as any }),
+      PG.INVALID_ENUM,
+    );
   });
 
   test("token_hash is required", async () => {
@@ -295,7 +308,7 @@ describe("events", () => {
     const game = await makeGame(db);
     const participant_id = crypto.randomUUID();
     const event = {
-      actor_type: "participant",
+      actor_type: "player",
       participant_id,
       client_action_id: "a1",
       version: 1,
@@ -305,12 +318,10 @@ describe("events", () => {
     expect(await db.$count(events, eq(events.game_id, game.game_id))).toBe(2);
   });
 
-  test("defaults: payload {}, round 0, phase null, outcome applied, schema_version 1, server_timestamp set", async () => {
+  test("defaults: payload {}, outcome applied, schema_version 1, server_timestamp set", async () => {
     const game = await makeGame(db);
     const event = await makeEvent(db, game.game_id);
     expect(event.payload).toEqual({});
-    expect(event.round).toBe(0);
-    expect(event.phase).toBeNull();
     expect(event.outcome).toBe("applied");
     expect(event.schema_version).toBe(1);
     expect(event.server_timestamp).toBeInstanceOf(Date);
@@ -391,7 +402,7 @@ describe("events", () => {
   test("phase, actor_type and outcome reject values outside their enums", async () => {
     const game = await makeGame(db);
     await expectDbError(
-      makeEvent(db, game.game_id, { phase: "auction" as any }),
+      makeEvent(db, game.game_id, { phase: "bids" as any }),
       PG.INVALID_ENUM,
     );
     await expectDbError(
@@ -410,6 +421,68 @@ describe("events", () => {
     const e2 = await makeEvent(db, game.game_id, { version: 2 });
     expect(e2.event_id).toBeGreaterThan(e1.event_id);
   });
+
+  describe("actor check", () => {
+    const CHECK = "events_actor_ids_check";
+
+    test("player event requires participant_id", async () => {
+      const game = await makeGame(db);
+      await expectDbError(
+        makeEvent(db, game.game_id, { actor_type: "player" }),
+        PG.CHECK,
+        CHECK,
+      );
+    });
+
+    test("teacher event requires teacher_id", async () => {
+      const game = await makeGame(db);
+      await expectDbError(
+        makeEvent(db, game.game_id, { actor_type: "teacher" }),
+        PG.CHECK,
+        CHECK,
+      );
+    });
+
+    test("system event cannot have a participant_id or teacher_id", async () => {
+      const game = await makeGame(db);
+      await expectDbError(
+        makeEvent(db, game.game_id, { participant_id: crypto.randomUUID() }),
+        PG.CHECK,
+        CHECK,
+      );
+      await expectDbError(
+        makeEvent(db, game.game_id, { teacher_id: "user_abc" }),
+        PG.CHECK,
+        CHECK,
+      );
+    });
+
+    test("player event cannot have a teacher_id", async () => {
+      const game = await makeGame(db);
+      await expectDbError(
+        makeEvent(db, game.game_id, {
+          actor_type: "player",
+          participant_id: crypto.randomUUID(),
+          teacher_id: "user_abc",
+        }),
+        PG.CHECK,
+        CHECK,
+      );
+    });
+
+    test("teacher event cannot have a participant_id", async () => {
+      const game = await makeGame(db);
+      await expectDbError(
+        makeEvent(db, game.game_id, {
+          actor_type: "teacher",
+          teacher_id: "user_abc",
+          participant_id: crypto.randomUUID(),
+        }),
+        PG.CHECK,
+        CHECK,
+      );
+    });
+  });
 });
 
 describe("cascades", () => {
@@ -427,7 +500,7 @@ describe("cascades", () => {
         .values({ game_id: game.game_id, user_id: "teacher" });
       await db.insert(snapshots).values({ game_id: game.game_id, state: {} });
       await makeEvent(db, game.game_id, {
-        actor_type: "participant",
+        actor_type: "player",
         participant_id: player.participant_id,
         team_id: team.team_id,
       });

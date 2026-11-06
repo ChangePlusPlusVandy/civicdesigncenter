@@ -1,5 +1,4 @@
 // Test helpers: fresh in-memory database, row factories, and a DB error assertion
-import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
@@ -7,6 +6,7 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 import { expect } from "vitest";
 import * as schema from "./drizzle-schema";
 import { games, teams, players, events } from "./drizzle-schema";
+import { hashToken } from "./tokens";
 
 export type TestDb = Awaited<ReturnType<typeof createTestDb>>;
 
@@ -18,9 +18,6 @@ export async function createTestDb() {
   });
   return db;
 }
-
-export const hashToken = (token: string) =>
-  createHash("sha256").update(token).digest("hex");
 
 // Keeps room codes / usernames / cities unique between calls
 let counter = 0;
@@ -42,7 +39,7 @@ export async function makeGame(
     await db
       .insert(games)
       .values({
-        scenario_id: 1,
+        scenario_id: "lc2-default",
         room_code: `R${next()}`,
         rng_seed: 1,
         ...overrides,
@@ -102,6 +99,8 @@ export async function makeEvent(
         seq: next(),
         actor_type: "system",
         version: 1,
+        round: 1,
+        phase: "lobby",
         type: "x",
         ...overrides,
       })
@@ -116,6 +115,7 @@ export const PG = {
   NOT_NULL: "23502",
   INVALID_ENUM: "22P02",
   TOO_LONG: "22001",
+  CHECK: "23514",
 } as const;
 
 // Drizzle wraps driver errors in DrizzleQueryError, the Postgres error is on .cause

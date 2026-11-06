@@ -1,8 +1,8 @@
 import * as z from "zod";
-import { phaseEnum } from "./drizzle-schema";
 
-// Event catalog: one payload schema per event type (the data contract).
-// No Node-only imports here, so the web client can import it too. The envelope and parseEvent live in log.ts.
+// Event catalog: one payload schema per event type (the data contract). Spec: docs/EVENTS.md.
+// No Node-only imports here, so the web client can import it too (@cs/shared/catalog).
+// The envelope and parseEvent live in apps/server/src/db/log.ts.
 // Change tags used in this file:
 //   FIX:      was wrong or contradicted the spec, now corrected
 //   ADDED:    was missing, the spec requires it
@@ -21,8 +21,13 @@ const Resources = z.record(z.string(), z.number().int());
 
 // ADDED: named id shapes, so every event uses the same type for the same thing.
 //   LC2 buildingId is the same id in the auction (as "lot") and on the map (as "building").
-export const TeamId = z.number().int(); // teams.team_id (integer in drizzle-schema)
+export const TeamId = z.number().int(); // teams.team_id, envelope only
+// EVT-011: payload fields that name a team hold the scenario city id. The server maps it through teams.city_key
+const CityId = z.string();
 const BuildingId = z.string(); // LC2 buildingId
+const Uint32 = z.number().int().nonnegative().max(0xffffffff); // RNG seed and RNG state
+const At = z.number().int().nonnegative(); // EVT-012: action time the engine received, epoch milliseconds
+const RoundNumber = z.number().int().positive();
 export const ParticipantId = z.uuid(); // players.participant_id
 
 // FIX: removed BuildingDoc (z.record of the full building doc). The spec says LC2 copies whole documents
@@ -34,10 +39,18 @@ const CityStats = z.object({
   resources: Resources, // related field: newRes.*
   population: z.number().int(), // related field: newPop
   happiness: z.number(), // related field: happiness (not forced to int: it can be a score/percentage)
+  pollution: z.number(),
 });
 
-// ADDED: phases come from the database enum, so the catalog and events.phase cannot drift apart
-export const Phase = z.enum(phaseEnum.enumValues);
+// The one list of phases. drizzle-schema.ts builds its pgEnum from this, so the catalog and events.phase cannot drift apart
+export const phases = [
+  "lobby",
+  "auction",
+  "build",
+  "resolve",
+  "ended",
+] as const;
+export const Phase = z.enum(phases);
 
 // NOTE (applies to every payload below): validation checks shape only, not game rules
 //   (e.g. no positive-amount or own-team checks). Rejected attempts carry bad values and must still be loggable.
@@ -84,17 +97,18 @@ export const eventPayloads = {
     lot: BuildingId, // related field: buildingId
     // FIX: removed the "STRAYS" note. "lot" is the equivalent of LC2 buildingId (parity rule), and
     //   lot_won / lot_unsold need it to point back at this lot.
-    location: z.unknown(), // related field: location
+    location: z.unknown().optional(), // related field: location. Optional: not in the docs/EVENTS.md payload
     // ADDED: LC2 parity, addBuilding has a live "location" field that had no equivalent here.
     // OPEN: the export has field names only, so the shape of location is unknown. Pin it down
     //   (a Cell? a market slot string?) and replace z.unknown().
+    rng: Uint32, // RULE-005: RNG state after the draw
     // LC2 userId -> envelope participant_id / teacher_id
   }),
 
   //LC2: BuildingAcquire
   "auction.lot_won": z.object({
     lot: BuildingId, // related field: buildingId
-    team: TeamId, // related field: baseId -> teams.team_id (integer in drizzle-schema)
+    team: CityId, // related field: baseId
     amount: z.number().int(), // related field: bidVal
     resourcesBefore: Resources, // related field: oldRes.*  (was misspelled "resourceBefore" and typed as a single int)
     resourcesAfter: Resources, // related field: newRes.*   (was typed as a single int)
@@ -107,7 +121,7 @@ export const eventPayloads = {
   //LC2: (NEW) -> auction.lot_unsold
   "auction.lot_unsold": z.object({
     lot: BuildingId, // related field: buildingId
-    tiedTeams: z.array(TeamId), // related field: (NEW) - team_ids of the tied teams, same type as lot_won.team
+    tiedTeams: z.array(CityId), // related field: (NEW) - city ids of the tied teams, same type as lot_won.team
     reason: z.enum(["tie", "no_bids"]), // related field: (NEW)
     // ADDED / DECISION: "system events with reasons". A lot can also go unsold because nobody bid;
     //   then tiedTeams is [], and without a reason an empty array is ambiguous.
@@ -153,11 +167,8 @@ export const eventPayloads = {
   //LC2: tradeResource
   // ADDED: whole event
   "trade.gift_sent": z.object({
-    trade: z.string(), // related field: trade doc id (NEW)
-    // ADDED / DECISION: not in the required payload, but trade.notification_read (LC2 readBy, a field on the trade)
-    //   has to say which trade was read. Without an id, nothing links the two.
-    fromTeam: TeamId, // related field: from (full city doc) -> its team id
-    toTeam: TeamId, // related field: to (full city doc) -> its team id
+    fromTeam: CityId, // related field: from (full city doc) -> its city id
+    toTeam: CityId, // related field: to (full city doc) -> its city id
     resource: z.string(), // related field: resource
     amount: z.number().int(), // related field: amount (this is also the delta for both sides)
     fromBefore: z.number().int(), // related field: from.res[resource]
@@ -165,7 +176,7 @@ export const eventPayloads = {
     // DECISION: fromBefore / toBefore are the single changed resource, not full resource maps ("log the fields
     //   that changed"). The after values are fromBefore - amount and toBefore + amount when the trade was applied,
     //   and unchanged when it was rejected.
-    // LC2 success -> envelope outcome (+ error_code); readBy -> trade.notification_read
+    // LC2 success -> envelope outcome (+ error_code); readBy -> not logged, it is UI state (EVT-002)
   }),
 
   //LC2: buildingResource
@@ -176,6 +187,7 @@ export const eventPayloads = {
   // ADDED: whole event (system event: one row per building, per production step)
   "production.building_ran": z
     .object({
+      team: CityId, // the city this building belongs to
       building: BuildingId, // related field: building._id (full doc -> id, see note at the top)
       inputs: Resources, // related field: (NEW) - resources the building consumed
       outputs: Resources, // related field: (NEW) - resources the building produced
@@ -203,6 +215,7 @@ export const eventPayloads = {
   //LC2: cityStatUpdate
   // ADDED: whole event (system event, one per team per round)
   "round.city_stats": z.object({
+    team: CityId,
     before: CityStats, // related field: (NEW) - LC2 only sends the new values
     after: CityStats, // related field: newRes.*, newPop, happiness
     happinessFactor: z.number(), // related field: (NEW) - "factors behind the change"
@@ -222,51 +235,57 @@ export const eventPayloads = {
     //   game adds later. Tighten once the state shape is fixed.
   }),
 
-  //LC2: tradeResource.readBy -> is field not key
-  // ADDED: whole event
-  // OPEN: the spec says "confirm with the stakeholder". Provisional shape: which trade was read; the reader is
-  //   the envelope's participant_id / team_id. before/after: unread -> read is implied by the event itself.
-  "trade.notification_read": z.object({
-    trade: z.string(), // related field: trade doc id (same value as trade.gift_sent.trade)
-  }),
-
   //LC2: (NEW) -> phase.advanced
   // ADDED
   "phase.advanced": z.object({
-    from: Phase.nullable(), // null when leaving the lobby (events.phase is null there too)
-    to: Phase.nullable(), // null when the game leaves the last phase
+    from: Phase,
+    to: Phase,
+    round: RoundNumber, // round in effect after the change
+    at: At,
   }),
 
   //LC2: (NEW) -> round.ended
   // ADDED
   "round.ended": z.object({
-    round: z.number().int().nonnegative(),
+    round: RoundNumber,
   }),
 
   //LC2: (NEW) -> game.started
   // ADDED
   "game.started": z.object({
-    scenario: z.number().int(), // games.scenario_id
-    seed: z.number().int(), // games.rng_seed
+    scenario: z.string(), // games.scenario_id, e.g. lc2-default
+    seed: Uint32, // games.rng_seed
+    at: At,
+  }),
+
+  //LC2: (NEW) -> game.paused
+  // Pause is a flag, not a phase, so these events are the only record of it
+  "game.paused": z.object({
+    at: At,
+  }),
+
+  //LC2: (NEW) -> game.resumed
+  "game.resumed": z.object({
+    at: At,
   }),
 
   //LC2: (NEW) -> game.ended
   // ADDED
   "game.ended": z.object({
-    reason: z.string().min(1),
-    // OPEN: swap for an enum (e.g. "completed" | "teacher_ended") once the game flow defines the end conditions.
+    reason: z.enum(["teacher", "resources_exhausted"]),
+    at: At,
   }),
 
   //LC2: (NEW) -> teacher.*
   // ADDED: one event per moderation action listed in the spec. All have actor_type "teacher".
   "teacher.team_assigned": z.object({
     participant: ParticipantId,
-    before: TeamId.nullable(), // players.team_id, null = no team (lobby)
-    after: TeamId.nullable(),
+    before: CityId.nullable(), // null = no team (lobby)
+    after: CityId.nullable(),
   }),
   "teacher.player_kicked": z.object({
     participant: ParticipantId,
-    team: TeamId.nullable(), // team the student was on, so analysts don't need the players table
+    team: CityId.nullable(), // team the student was on, so analysts don't need the players table
   }),
   "teacher.player_renamed": z.object({
     participant: ParticipantId,
@@ -274,7 +293,7 @@ export const eventPayloads = {
     //   wins over before/after here. The event still records that and when the rename happened.
   }),
   "teacher.team_renamed": z.object({
-    team: TeamId,
+    team: CityId,
     // DECISION: no before / after names, same reason as teacher.player_renamed (team names are typed text).
     // OPEN: if team names are picked from a fixed list, they are safe to log as before / after.
   }),

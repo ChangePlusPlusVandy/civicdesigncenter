@@ -1,5 +1,3 @@
-//TWO BIG THINGS: seq I defualted to 0, and actor_type to "system" in events table. Snapshots table in this schema holds latest state while snapshots in catalog.ts holds per game. It can be consolidated if that is what is wanted.
-
 // Drizzle schema: games, players, teams, game_roles, snapshots (state JSON + version), events
 // Driver chosen by DATABASE_URL: blank = PGlite (./pglite/), otherwise pg
 // Tests run on in-memory PGlite
@@ -9,6 +7,7 @@
 
 import {
   jsonb,
+  check,
   bigint,
   uuid,
   boolean,
@@ -24,10 +23,11 @@ import {
   primaryKey,
   foreignKey,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
+import { phases } from "@cs/shared/catalog";
 
-// The options for phases can be changed and should once the game is fully designed.
-export const phaseEnum = pgEnum("phase", ["bids", "sell", "trade"]);
+// The values live in the event catalog, so events.phase and the catalog cannot drift apart
+export const phaseEnum = pgEnum("phase", phases);
 
 //The options for game status can be changed and should be once the game is fully designed
 export const gameStatusEnum = pgEnum("game_status", [
@@ -38,9 +38,12 @@ export const gameStatusEnum = pgEnum("game_status", [
 
 export const roleEnum = pgEnum("roles", ["owner", "player"]);
 
+// players.role. seat = a regular player in a team seat. Add values here (and generate a migration) as the game design needs them
+export const playerRoleEnum = pgEnum("player_role", ["seat"]);
+
 // Event envelope enums. log.ts reads their values, so the zod envelope and the table cannot drift apart
 export const actorTypeEnum = pgEnum("actor_type", [
-  "participant",
+  "player",
   "teacher",
   "system",
 ]);
@@ -50,9 +53,9 @@ export const outcomeEnum = pgEnum("outcome", ["applied", "rejected"]);
 // The other columns can be changed depending on what the game system flow is.
 export const games = pgTable("games", {
   game_id: integer().generatedByDefaultAsIdentity().primaryKey(),
-  scenario_id: integer().notNull(),
+  scenario_id: text().notNull(),
   room_code: varchar({ length: 10 }).notNull().unique(),
-  rng_seed: integer().notNull(),
+  rng_seed: bigint({ mode: "number" }).notNull(), // uint32, too large for a signed integer column
   game_status: gameStatusEnum().default("lobby").notNull(),
   max_size: integer(),
   locked: boolean().default(false).notNull(),
@@ -100,7 +103,7 @@ export const players = pgTable(
       onDelete: "set null",
     }), // null = no team yet (lobby)
     username: text().notNull(),
-    role: text().default("seat").notNull(),
+    role: playerRoleEnum().default("seat").notNull(),
     token_hash: text().notNull(),
     kicked_at: timestamp({ withTimezone: true }),
     last_seen: timestamp({ withTimezone: true }),
@@ -161,9 +164,9 @@ export const events = pgTable(
     game_id: integer()
       .notNull()
       .references(() => games.game_id, { onDelete: "cascade" }),
-    seq: integer().default(0).notNull(), // 1, 2, 3... per game, no gaps
+    seq: integer().notNull(), // 1, 2, 3... per game, no gaps
     schema_version: integer().default(1).notNull(), // bump when a payload shape in catalog.ts changes
-    actor_type: actorTypeEnum().default("system").notNull(),
+    actor_type: actorTypeEnum().notNull(),
     participant_id: uuid(), // players.participant_id, null for teacher and system events
     teacher_id: text(), // game_roles.user_id (Better Auth id, not a uuid), null unless actor_type = teacher
     team_id: integer().references(() => teams.team_id, {
@@ -173,8 +176,8 @@ export const events = pgTable(
     version: integer().notNull(), // snapshot version this event produced
     outcome: outcomeEnum().default("applied").notNull(),
     error_code: text(), // set only when outcome = rejected
-    round: integer().default(0).notNull(),
-    phase: phaseEnum(), // null outside a phase (e.g. lobby)
+    round: integer().notNull(),
+    phase: phaseEnum().notNull(), // phase in effect when the event was written
     type: text().notNull(),
     payload: jsonb().default({}).notNull(),
     server_timestamp: timestamp({ withTimezone: true }).defaultNow().notNull(),
@@ -192,6 +195,17 @@ export const events = pgTable(
       columns: [t.team_id, t.game_id],
       foreignColumns: [teams.team_id, teams.game_id],
     }),
+    check(
+      "events_actor_ids_check",
+      sql`
+    (${t.actor_type} = 'player'
+      AND ${t.participant_id} IS NOT NULL AND ${t.teacher_id} IS NULL)
+    OR (${t.actor_type} = 'teacher'
+      AND ${t.teacher_id} IS NOT NULL AND ${t.participant_id} IS NULL)
+    OR (${t.actor_type} = 'system'
+      AND ${t.participant_id} IS NULL AND ${t.teacher_id} IS NULL)
+  `,
+    ),
   ],
 );
 

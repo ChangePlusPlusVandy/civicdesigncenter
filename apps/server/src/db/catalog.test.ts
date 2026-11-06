@@ -2,25 +2,25 @@
 // No database except for the seed check, which uses an in-memory PGlite like db.test.ts.
 
 import { test, describe, expect } from "vitest";
-import { eventPayloads, eventTypes } from "./catalog";
+import { eventPayloads, eventTypes, phases } from "@cs/shared/catalog";
 import { parseEvent } from "./log";
-import { events } from "./drizzle-schema";
+import { events, phaseEnum } from "./drizzle-schema";
 import { createTestDb } from "./helpers";
 import { seed } from "./seed";
 
 const participant = "6f1c2a8e-3b4d-4e5f-8a9b-0c1d2e3f4a5b";
 
-// A valid participant event; pass overrides for the field under test
+// A valid player event; pass overrides for the field under test
 const event = (overrides: Record<string, unknown> = {}) => ({
   type: "auction.bid_changed",
   ts: new Date(),
   game_id: 1,
   round: 1,
-  phase: "bids",
+  phase: "auction",
   team_id: 1,
   participant_id: participant,
   teacher_id: null,
-  actor_type: "participant",
+  actor_type: "player",
   outcome: "applied",
   error_code: null,
   client_action_id: "a1",
@@ -53,18 +53,27 @@ describe("catalog", () => {
       "building.removed",
       "building.toggled",
       "trade.gift_sent",
-      "trade.notification_read",
       "production.building_ran",
       "round.city_stats",
       "round.snapshot",
       "phase.advanced",
       "round.ended",
       "game.started",
+      "game.paused",
+      "game.resumed",
       "game.ended",
     ]) {
       expect(type in eventPayloads, `missing ${type}`).toBeTruthy();
     }
     expect(eventTypes.some((t) => t.startsWith("teacher."))).toBeTruthy();
+  });
+
+  test("notification reads are not logged (EVT-002)", () => {
+    expect("trade.notification_read" in eventPayloads).toBe(false);
+  });
+
+  test("the database phase enum uses the catalog's phases", () => {
+    expect(phaseEnum.enumValues).toEqual([...phases]);
   });
 
   test("a valid event parses", () => {
@@ -94,6 +103,117 @@ describe("catalog", () => {
         }),
       ),
     ).toThrow();
+  });
+});
+
+describe("payloads match docs/EVENTS.md", () => {
+  const parse = (type: keyof typeof eventPayloads, payload: unknown) =>
+    eventPayloads[type].parse(payload);
+
+  test("game.started takes a scenario id string, a uint32 seed and at", () => {
+    const valid = { scenario: "lc2-default", seed: 42, at: 1000 };
+    expect(parse("game.started", valid)).toEqual(valid);
+    expect(() => parse("game.started", { ...valid, scenario: 1 })).toThrow();
+    expect(() => parse("game.started", { ...valid, seed: -1 })).toThrow();
+    expect(() =>
+      parse("game.started", { scenario: "lc2-default", seed: 42 }),
+    ).toThrow();
+  });
+
+  test("game.ended only accepts the spec's reasons", () => {
+    expect(parse("game.ended", { reason: "teacher", at: 1 })).toBeTruthy();
+    expect(
+      parse("game.ended", { reason: "resources_exhausted", at: 1 }),
+    ).toBeTruthy();
+    expect(() => parse("game.ended", { reason: "other", at: 1 })).toThrow();
+  });
+
+  test("game.paused and game.resumed need at", () => {
+    expect(parse("game.paused", { at: 1 })).toEqual({ at: 1 });
+    expect(parse("game.resumed", { at: 1 })).toEqual({ at: 1 });
+    expect(() => parse("game.paused", {})).toThrow();
+    expect(() => parse("game.resumed", {})).toThrow();
+  });
+
+  test("phase.advanced needs real phases, round and at", () => {
+    const valid = { from: "lobby", to: "auction", round: 1, at: 1 };
+    expect(parse("phase.advanced", valid)).toEqual(valid);
+    expect(() => parse("phase.advanced", { ...valid, from: null })).toThrow();
+    expect(() => parse("phase.advanced", { ...valid, round: 0 })).toThrow();
+    expect(() =>
+      parse("phase.advanced", { from: "lobby", to: "auction" }),
+    ).toThrow();
+  });
+
+  test("trade.gift_sent uses city ids and drops the trade id", () => {
+    const valid = {
+      fromTeam: "red",
+      toTeam: "blue",
+      resource: "cash",
+      amount: 5,
+      fromBefore: 10,
+      toBefore: 0,
+    };
+    expect(parse("trade.gift_sent", { ...valid, trade: "t1" })).toEqual(valid);
+    expect(() => parse("trade.gift_sent", { ...valid, fromTeam: 1 })).toThrow();
+  });
+
+  test("auction.lot_won and lot_unsold name teams by city id", () => {
+    const won = {
+      lot: "lot-1",
+      team: "red",
+      resource: "cash",
+      amount: 5,
+      resourcesBefore: { cash: 10 },
+      resourcesAfter: { cash: 5 },
+    };
+    expect(parse("auction.lot_won", won)).toEqual(won);
+    expect(() => parse("auction.lot_won", { ...won, team: 1 })).toThrow();
+    const unsold = { lot: "lot-1", tiedTeams: ["red", "blue"], reason: "tie" };
+    expect(parse("auction.lot_unsold", unsold)).toEqual(unsold);
+    expect(() =>
+      parse("auction.lot_unsold", { ...unsold, tiedTeams: [1, 2] }),
+    ).toThrow();
+  });
+
+  test("auction.lot_added carries the RNG state", () => {
+    const lot = { lot: "lot-1", buildingType: "farm", resource: "cash" };
+    expect(parse("auction.lot_added", { ...lot, rng: 7 })).toBeTruthy();
+    expect(() => parse("auction.lot_added", lot)).toThrow();
+  });
+
+  test("round.city_stats needs a team and pollution", () => {
+    const stats = {
+      resources: { cash: 1 },
+      population: 1,
+      happiness: 1,
+      pollution: 0,
+    };
+    const valid = {
+      team: "red",
+      before: stats,
+      after: stats,
+      happinessFactor: 1,
+      populationFactor: 1,
+    };
+    expect(parse("round.city_stats", valid)).toEqual(valid);
+    expect(() =>
+      parse("round.city_stats", { ...valid, team: undefined }),
+    ).toThrow();
+    const { pollution: _pollution, ...noPollution } = stats;
+    expect(() =>
+      parse("round.city_stats", { ...valid, after: noPollution }),
+    ).toThrow();
+  });
+});
+
+describe("envelope: round and phase", () => {
+  test("round must be at least 1", () => {
+    expect(() => parseEvent(event({ round: 0 }))).toThrow();
+  });
+
+  test("phase is required", () => {
+    expect(() => parseEvent(event({ phase: null }))).toThrow();
   });
 });
 
@@ -196,8 +316,9 @@ describe("system events with reasons", () => {
     event({
       ...system,
       type: "production.building_ran",
-      phase: null,
+      phase: "resolve",
       payload: {
+        team: "red",
         building: "b1",
         inputs: {},
         outputs: {},

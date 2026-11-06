@@ -1,5 +1,5 @@
 {
-  "id": "7bdb0867-f356-4177-a0ca-8809cf469378",
+  "id": "2554cd89-16ec-4a32-9e65-0eeb3961eea1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -31,11 +31,43 @@
           "primaryKey": false,
           "notNull": true
         },
+        "seq": {
+          "name": "seq",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "actor_type": {
+          "name": "actor_type",
+          "type": "actor_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
         "participant_id": {
           "name": "participant_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
+        },
+        "teacher_id": {
+          "name": "teacher_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "client_action_id": {
           "name": "client_action_id",
@@ -49,19 +81,32 @@
           "primaryKey": false,
           "notNull": true
         },
+        "outcome": {
+          "name": "outcome",
+          "type": "outcome",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'applied'"
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "round": {
           "name": "round",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "default": 0
+          "notNull": true
         },
         "phase": {
           "name": "phase",
           "type": "phase",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "type": {
           "name": "type",
@@ -85,6 +130,27 @@
         }
       },
       "indexes": {
+        "events_game_seq_index": {
+          "name": "events_game_seq_index",
+          "columns": [
+            {
+              "expression": "game_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "seq",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "events_game_version_idx": {
           "name": "events_game_version_idx",
           "columns": [
@@ -126,6 +192,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "events_team_idx": {
+          "name": "events_team_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -141,12 +222,45 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "events_team_id_teams_team_id_fk": {
+          "name": "events_team_id_teams_team_id_fk",
+          "tableFrom": "events",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "team_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "events_team_same_game_fk": {
+          "name": "events_team_same_game_fk",
+          "tableFrom": "events",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id",
+            "game_id"
+          ],
+          "columnsTo": [
+            "team_id",
+            "game_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "events_actor_ids_check": {
+          "name": "events_actor_ids_check",
+          "value": "\n    (\"events\".\"actor_type\" = 'player'\n      AND \"events\".\"participant_id\" IS NOT NULL AND \"events\".\"teacher_id\" IS NULL)\n    OR (\"events\".\"actor_type\" = 'teacher'\n      AND \"events\".\"teacher_id\" IS NOT NULL AND \"events\".\"participant_id\" IS NULL)\n    OR (\"events\".\"actor_type\" = 'system'\n      AND \"events\".\"participant_id\" IS NULL AND \"events\".\"teacher_id\" IS NULL)\n  "
+        }
+      },
       "isRLSEnabled": false
     },
     "public.game_roles": {
@@ -234,7 +348,7 @@
         },
         "scenario_id": {
           "name": "scenario_id",
-          "type": "integer",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -246,7 +360,7 @@
         },
         "rng_seed": {
           "name": "rng_seed",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": true
         },
@@ -352,6 +466,14 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "player_role",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'seat'"
         },
         "token_hash": {
           "name": "token_hash",
@@ -629,6 +751,15 @@
     }
   },
   "enums": {
+    "public.actor_type": {
+      "name": "actor_type",
+      "schema": "public",
+      "values": [
+        "player",
+        "teacher",
+        "system"
+      ]
+    },
     "public.game_status": {
       "name": "game_status",
       "schema": "public",
@@ -638,13 +769,30 @@
         "ended"
       ]
     },
+    "public.outcome": {
+      "name": "outcome",
+      "schema": "public",
+      "values": [
+        "applied",
+        "rejected"
+      ]
+    },
     "public.phase": {
       "name": "phase",
       "schema": "public",
       "values": [
-        "bids",
-        "sell",
-        "trade"
+        "lobby",
+        "auction",
+        "build",
+        "resolve",
+        "ended"
+      ]
+    },
+    "public.player_role": {
+      "name": "player_role",
+      "schema": "public",
+      "values": [
+        "seat"
       ]
     },
     "public.roles": {
