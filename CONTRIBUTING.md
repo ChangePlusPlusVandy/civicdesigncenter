@@ -12,6 +12,17 @@
 5. Delete your branch after it merges. Merge or rebase `main` often, and flag
    overlapping work early.
 
+## Specifications
+
+- Read the relevant documents in [`docs/`](docs/README.md) before you start.
+- A PR that changes behavior updates the affected spec in the same PR.
+  Follow [`docs/SPEC-GUIDELINES.md`](docs/SPEC-GUIDELINES.md).
+- Decisions made in syncs or issue threads are written into the affected spec.
+- If the code and a spec disagree, open an issue labelled `docs` instead of
+  changing either one silently.
+- Coding agents follow [`AGENTS.md`](AGENTS.md); you are responsible for what
+  they produce.
+
 ## Pull requests
 
 - Keep them small: one issue, ideally under ~400 changed lines.
