@@ -24,3 +24,6 @@ export function normalizeRoomCode(code: string | undefined): string | null {
   const normalizedCode = code.trim().toUpperCase();
   return ROOM_CODE_PATTERN.test(normalizedCode) ? normalizedCode : null;
 }
+
+export * from "./actions.ts";
+export * from "./scenario.ts";
