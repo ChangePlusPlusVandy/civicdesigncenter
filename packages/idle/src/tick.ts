@@ -156,12 +156,19 @@ export function runTick(state: IdleState): ReduceResult {
       { tick, health: regionHealth({ ...state, commons }) },
     ].slice(-HISTORY_LENGTH);
   }
-  const offers = state.offers.map((offer) =>
-    offer.status === "open" &&
-    tick - offer.createdTick >= TRADE.expiresAfterTicks
-      ? { ...offer, status: "expired" as const }
-      : offer,
-  );
+  const offers = state.offers.map((offer) => {
+    if (
+      offer.status !== "open" ||
+      tick - offer.createdTick < TRADE.expiresAfterTicks
+    )
+      return offer;
+    events.push({
+      type: "trade.expired",
+      city: offer.from,
+      payload: { offerId: offer.id },
+    });
+    return { ...offer, status: "expired" as const };
+  });
 
   return {
     ok: true,

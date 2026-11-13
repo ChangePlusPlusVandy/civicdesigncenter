@@ -3,6 +3,7 @@
 // lesson: overusing the commons loses to sharing it.
 
 import { describe, expect, it } from "vitest";
+import { catalogProblem } from "./catalog.ts";
 import { BUILDABLE, GOODS, type BuildableKind } from "./content.ts";
 import {
   housing,
@@ -13,7 +14,7 @@ import {
 } from "./economy.ts";
 import { MAP_IDS, type CityId, type MapId } from "./map.ts";
 import { createGame, reduce } from "./rules.ts";
-import type { CityState, IdleState, Intent } from "./types.ts";
+import type { CityState, GameEvent, IdleState, Intent } from "./types.ts";
 
 type Strategy = (state: IdleState, city: CityState) => Intent | null;
 
@@ -126,6 +127,7 @@ function play(strategy: Strategy, ticks: number, mapId: MapId = "classic") {
   const start = reduce(state, { kind: "teacher" }, { type: "start" });
   if (!start.ok) throw new Error(start.error.message);
   state = start.state;
+  checkCatalog(start.events);
   let riverCollapsed = false;
   const log: Intent[] = [];
 
@@ -138,15 +140,23 @@ function play(strategy: Strategy, ticks: number, mapId: MapId = "classic") {
       if (result.ok) {
         state = result.state;
         log.push(intent);
+        checkCatalog(result.events);
       }
     }
     const tick = reduce(state, { kind: "system" }, { type: "tick" });
     if (!tick.ok) throw new Error(tick.error.message);
     state = tick.state;
+    checkCatalog(tick.events);
     riverCollapsed ||= state.commons.river.collapsed;
     assertSane(state);
   }
   return { state, riverCollapsed, log };
+}
+
+// Every event a whole game emits matches the catalog (EVT-010).
+function checkCatalog(events: GameEvent[]) {
+  for (const event of events)
+    expect(catalogProblem(event, "accepted")).toBeNull();
 }
 
 function assertSane(state: IdleState) {

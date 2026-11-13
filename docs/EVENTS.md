@@ -1,11 +1,11 @@
 # Event log
 
-| Field         | Value                                                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Status        | Draft (frozen with the Nashville spec, #27)                                                                        |
-| Applies to    | `packages/engine` event types, `events` table, event catalog (`packages/shared/src/catalog.ts`), data export (#48) |
-| Last reviewed | 2026-11-06                                                                                                         |
-| Related       | #48, #64, #65, PR #70, PR #73, PR #74, [`ARCHITECTURE.md`](ARCHITECTURE.md) §4, [`GAME-RULES.md`](GAME-RULES.md)   |
+| Field         | Value                                                                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status        | Draft (frozen with the Nashville spec, #27)                                                                                                               |
+| Applies to    | `packages/engine` event types, `events` table, event catalog (`packages/shared/src/catalog.ts`), data export (#48); §7: `packages/idle`, `sandbox_events` |
+| Last reviewed | 2026-11-06                                                                                                                                                |
+| Related       | #48, #64, #65, PR #70, PR #73, PR #74, PR #75, [`ARCHITECTURE.md`](ARCHITECTURE.md) §4, [`GAME-RULES.md`](GAME-RULES.md)                                  |
 
 ## 1. Scope
 
@@ -207,3 +207,80 @@ city stats factors.
 | `buildingRun`     | `game.pollution` before and after           | `natureBefore`, `natureAfter`                            |
 | `buildingRun`     | `game.res.*`                                | `inputs`, `outputs` and `round.snapshot`                 |
 | `cityStatUpdate`  | `newRes.*`, `newPop`, `happiness`           | `after.resources`, `after.population`, `after.happiness` |
+
+## 7. Idle-builder sandbox
+
+Status: In review (PR #75). The sandbox prototype
+([`ARCHITECTURE.md`](ARCHITECTURE.md) §11) logs its own events to
+`sandbox_events`. EVT-001 to EVT-003, EVT-008 and EVT-010 apply to it. Its
+catalog is `packages/idle/src/catalog.ts`; `SCHEMA_VERSION` is 1.
+
+### 7.1 Log row
+
+| Field           | Type                          | Rule                                                                  |
+| --------------- | ----------------------------- | --------------------------------------------------------------------- |
+| `seq`           | integer ≥ 1                   | Per game, gapless                                                     |
+| `tick`          | integer ≥ 0                   | Tick in effect when the event was written                             |
+| `at`            | integer ≥ 0                   | Write time, epoch milliseconds                                        |
+| `actor`         | `player`, `teacher`, `system` | Required                                                              |
+| `participantId` | uuid, optional                | Set for player events and `player.joined`                             |
+| `city`          | city id, optional             | The team the event concerns; absent for game-wide events              |
+| `type`          | text                          | Event type from §7.3, or the intent type of a rejected attempt        |
+| `outcome`       | `accepted`, `rejected`        | Required                                                              |
+| `errorCode`     | text, optional                | `RuleError` code, `BAD_REQUEST` or `INTERNAL`; set only when rejected |
+| `payload`       | object                        | Schema per `type` (§7.3)                                              |
+| `schemaVersion` | integer ≥ 1                   | Catalog version; absent on rows written before the catalog            |
+
+### 7.2 Rules
+
+- EVT-030: The server MUST check every event against the catalog before it
+  changes the state or writes the row. An engine event that fails the check
+  fails its action with `INTERNAL` and changes nothing.
+- EVT-031: A rejected attempt is logged under the intent's type with payload
+  `{ intent }`, holding the intent as validated by ARCH-081.
+- EVT-032: A message that fails validation is logged as `action.invalid`
+  with an empty payload and `errorCode: BAD_REQUEST`. Nothing the client
+  sent is stored.
+- EVT-033: Display names never appear in a row. The server adds the actor's
+  name only when sending an event to the actor's own team or the teacher.
+- EVT-034: Production, consumption and population changes on each tick are
+  not logged per tick. City trends are kept in the game state
+  (`history`) and exported with the season reports.
+
+### 7.3 Event types
+
+Payload ids (`playerId`, `buildingId`, `offerId`) are strings from the game
+state. Bundles are `{ coins?, food?, wood?, clay?, copper? }` of integers ≥ 0.
+
+| `type`                   | Actor           | Emitted when                                    | Payload                                                                       |
+| ------------------------ | --------------- | ----------------------------------------------- | ----------------------------------------------------------------------------- |
+| `game.started`           | teacher         | Teacher starts the game                         | `cities` (city ids, 2–5)                                                      |
+| `game.speed_changed`     | teacher         | Teacher changes the speed                       | `before`, `after` (1, 2 or 4)                                                 |
+| `game.ended`             | teacher         | Teacher ends the game                           | `reason` (`teacher`)                                                          |
+| `game.restored`          | system          | A saved game is loaded after a restart          | `version`                                                                     |
+| `phase.advanced`         | teacher, system | Pause or resume, including the pause on restore | `from`, `to` (`lobby`, `running`, `paused`, `meeting`, `ended`)               |
+| `player.joined`          | system          | A student joins                                 | none                                                                          |
+| `building.built`         | player          | A building is placed                            | `building` (full building), `cost` (bundle)                                   |
+| `building.upgraded`      | player          | A building goes up a level                      | `buildingId`, `kind`, `before`, `after` (levels 1–3), `cost` (bundle)         |
+| `building.demolished`    | player          | A building is removed                           | `building`                                                                    |
+| `building.toggled`       | player          | A workplace is started or stopped               | `buildingId`, `before`, `after` (running, boolean)                            |
+| `market.bought`          | player          | A city buys from the class market               | `good`, `amount`, `price` (per unit), `total`                                 |
+| `market.sold`            | player          | A city sells to the class market                | `good`, `amount`, `price` (per unit), `total`                                 |
+| `trade.proposed`         | player          | A city offers a swap to another city            | `offer` (full offer)                                                          |
+| `trade.accepted`         | player          | The receiving city accepts                      | `offer`, `fromBefore`, `toBefore` (each `{ coins, goods }`)                   |
+| `trade.declined`         | player          | The receiving city declines                     | `offerId`                                                                     |
+| `trade.cancelled`        | player          | The offering city withdraws                     | `offerId`                                                                     |
+| `trade.expired`          | system          | An open offer runs out of time                  | `offerId`                                                                     |
+| `meeting.started`        | teacher         | Teacher calls a Town Meeting                    | `season`, `policyIds` (1–3)                                                   |
+| `meeting.voted`          | player          | A city votes or changes its vote                | `policyId`, `before` (boolean or null), `after`                               |
+| `meeting.closed`         | teacher         | Teacher closes voting                           | `season`, `passed`, `failed` (policy ids), `tally` (`{ yes, no }` per policy) |
+| `policy.passed`          | teacher         | Per policy that passed at a meeting             | `policyId`                                                                    |
+| `season.ended`           | teacher         | A meeting closes the season                     | `season`                                                                      |
+| `event.triggered`        | teacher         | Teacher sets off a drought, festival or flood   | `kind`, `cities` (flooded city ids; flood only)                               |
+| `commons.collapsed`      | system          | The river or a woods runs nearly empty          | `commons` (`river`, `westWoods`, `eastWoods`)                                 |
+| `commons.recovered`      | system          | A collapsed commons regrows enough              | `commons`                                                                     |
+| `goal.achieved`          | player, system  | A city reaches a goal                           | `goal` (goal id)                                                              |
+| `reflection.submitted`   | player          | A student answers the season question           | `season`, `text` (1–400 characters)                                           |
+| `teacher.player_moved`   | teacher         | Teacher moves a student to another city         | `playerId`, `before`, `after` (city ids)                                      |
+| `teacher.player_removed` | teacher         | Teacher removes a student                       | `playerId`, `city`                                                            |
+| `action.invalid`         | player, teacher | A message fails validation (EVT-032)            | none                                                                          |

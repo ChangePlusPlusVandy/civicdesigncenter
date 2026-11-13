@@ -134,6 +134,9 @@ The server is authoritative, as in `ARCHITECTURE.md`:
    timeout can't run it twice. The server remembers recent ids across
    restarts.
 4. Rejected attempts are logged with their error code, like accepted ones.
+   Every event type and payload is in [`EVENTS.md`](EVENTS.md) §7 and checked
+   against the zod catalog in `packages/idle/src/catalog.ts` before it is
+   kept.
 
 ## Screens
 

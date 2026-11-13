@@ -1,6 +1,7 @@
 // @cs/idle: the idle-builder prototype's rules. Pure and deterministic, no
 // I/O. See docs/IDLE-PROTOTYPE.md.
 
+export * from "./catalog.ts";
 export * from "./content.ts";
 export * from "./economy.ts";
 export * from "./map.ts";

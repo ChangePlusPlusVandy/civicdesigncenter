@@ -1,11 +1,11 @@
 # Architecture
 
-| Field         | Value                                                                                         |
-| ------------- | --------------------------------------------------------------------------------------------- |
-| Status        | Active                                                                                        |
-| Applies to    | `apps/web`, `apps/server`, `packages/*`, `deploy/*`                                           |
-| Last reviewed | 2026-11-01                                                                                    |
-| Related       | #14–#19, #24–#26, #64, PR #70, [`INTERACTIONS.md`](INTERACTIONS.md), [`EVENTS.md`](EVENTS.md) |
+| Field         | Value                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------- |
+| Status        | Active                                                                                                |
+| Applies to    | `apps/web`, `apps/server`, `packages/*`, `deploy/*`                                                   |
+| Last reviewed | 2026-11-01                                                                                            |
+| Related       | #14–#19, #24–#26, #64, PR #70, PR #75, [`INTERACTIONS.md`](INTERACTIONS.md), [`EVENTS.md`](EVENTS.md) |
 
 ## 1. Scope
 
@@ -212,3 +212,34 @@ all clients, hard-coded credentials).
 - ARCH-083: Credentials and secrets MUST come from the environment.
 - ARCH-084: Phases and turn order MUST be enforced by the engine on the
   server, never only in the UI.
+
+## 11. Idle-builder sandbox
+
+Status: In review (PR #75). The sandbox is a separate prototype game
+(`packages/idle`, `apps/server/src/sandbox`) that runs beside the main game
+without sharing its engine, tables or routes. The design is in
+[`IDLE-PROTOTYPE.md`](IDLE-PROTOTYPE.md); its events are in
+[`EVENTS.md`](EVENTS.md) §7.
+
+| Part      | Value                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------- |
+| REST      | `/api/sandbox/games`, `/api/sandbox/games/:code`, `…/join`, `…/log`, `…/export/:kind`    |
+| Socket.IO | Namespace `/sandbox`; client events `action`, `admin`; server events `state`, `events`   |
+| Tables    | `sandbox_games` (one snapshot per game), `sandbox_events` (the log)                      |
+| Config    | `DATABASE_URL`, or a PGlite folder in `SANDBOX_PGLITE_DIR` (default `./.pglite-sandbox`) |
+
+- ARCH-090: The sandbox follows the action pipeline rules ARCH-010, ARCH-012,
+  ARCH-021, ARCH-022 and ARCH-081 within its own namespace and tables.
+- ARCH-091: The sandbox MUST NOT read or write the main game's tables, and
+  its tables carry the `sandbox_` prefix.
+- ARCH-092: The server MUST reject any sandbox socket message larger than
+  16 KB.
+- ARCH-093: An error while handling one sandbox message MUST fail only that
+  message, with code `INTERNAL`, and MUST NOT stop the process.
+- ARCH-094: The server MUST remember each participant's recent
+  `clientActionId`s in the saved game, so a retry after a restart is not
+  applied twice.
+- ARCH-095: A failed save MUST keep its unsaved log rows for the next save.
+  Rows are written at most 1,000 per statement.
+- ARCH-096: With `NODE_ENV=production`, the server MUST exit at startup with
+  a message when neither `DATABASE_URL` nor `SANDBOX_PGLITE_DIR` is set.

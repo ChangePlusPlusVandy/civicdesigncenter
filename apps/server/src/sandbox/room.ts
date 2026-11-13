@@ -1,6 +1,8 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
+  SCHEMA_VERSION,
   TICK_MS,
+  catalogProblem,
   createGame,
   project,
   reduce,
@@ -254,6 +256,16 @@ export class GameRoom {
       };
     }
 
+    // The engine's events must match the catalog before anything is kept
+    // (EVT-010). A mismatch is a bug: fail the action, change nothing.
+    const problem = firstProblem(result.events, "accepted");
+    if (problem) {
+      console.error(
+        `Event outside the catalog in game ${this.code}: ${problem}`,
+      );
+      return { ok: false, code: "INTERNAL", message: "Something went wrong." };
+    }
+
     this.state = result.state;
     this.version += 1;
     this.remember(key);
@@ -295,23 +307,33 @@ export class GameRoom {
     const player = this.playerById(message.playerId);
     if (!player)
       return { ok: false, code: "NOT_FOUND", message: "No such player." };
+    let event: GameEvent;
     if (message.type === "movePlayer") {
       if (!this.state.cityIds.includes(message.cityId)) {
         return { ok: false, code: "BAD_REQUEST", message: "No such city." };
       }
+      event = {
+        type: "teacher.player_moved",
+        city: message.cityId,
+        payload: {
+          playerId: player.id,
+          before: player.cityId,
+          after: message.cityId,
+        },
+      };
       player.cityId = message.cityId;
     } else if (message.type === "removePlayer") {
+      event = {
+        type: "teacher.player_removed",
+        city: player.cityId,
+        payload: { playerId: player.id, city: player.cityId },
+      };
       this.players.delete(player.tokenHash);
     } else {
       return { ok: false, code: "BAD_REQUEST", message: "Unknown change." };
     }
     this.version += 1;
-    this.changed(
-      this.record(
-        [{ type: `teacher.${message.type}`, payload: { ...message } }],
-        "teacher",
-      ),
-    );
+    this.changed(this.record([event], "teacher"));
     return { ok: true, version: this.version };
   }
 
@@ -321,6 +343,13 @@ export class GameRoom {
     const result = reduce(this.state, { kind: "system" }, { type: "tick" });
     if (!result.ok) {
       this.schedule();
+      return;
+    }
+    const problem = firstProblem(result.events, "accepted");
+    if (problem) {
+      console.error(
+        `Event outside the catalog in game ${this.code}: ${problem}`,
+      );
       return;
     }
     this.state = result.state;
@@ -444,6 +473,9 @@ export class GameRoom {
     participantId?: string,
     errorCode?: string,
   ): LoggedEvent[] {
+    const outcome: LoggedEvent["outcome"] = errorCode ? "rejected" : "accepted";
+    const problem = firstProblem(events, outcome);
+    if (problem) throw new Error(`Event outside the catalog: ${problem}`);
     const at = Date.now();
     const rows = events.map((event) => ({
       ...event,
@@ -452,8 +484,9 @@ export class GameRoom {
       at,
       actor,
       participantId,
-      outcome: errorCode ? ("rejected" as const) : ("accepted" as const),
+      outcome,
       errorCode,
+      schemaVersion: SCHEMA_VERSION,
     }));
     this.log.push(...rows);
     if (this.log.length > MAX_LOG)
@@ -485,4 +518,16 @@ function actorOf(identity: Identity & { kind: "teacher" | "player" }): Actor {
         participantId: identity.player.id,
       }
     : { kind: "teacher" };
+}
+
+// The first event that doesn't match the catalog, described, or null.
+function firstProblem(
+  events: GameEvent[],
+  outcome: LoggedEvent["outcome"],
+): string | null {
+  for (const event of events) {
+    const problem = catalogProblem(event, outcome);
+    if (problem) return problem;
+  }
+  return null;
 }

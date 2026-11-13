@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BUILDINGS, MARKET, START } from "./content.ts";
+import { catalogProblem } from "./catalog.ts";
+import { BUILDINGS, MARKET, START, TRADE } from "./content.ts";
 import { marketPrice, upgradeCost } from "./economy.ts";
 import { project } from "./projection.ts";
 import { createGame, reduce } from "./rules.ts";
@@ -10,9 +11,13 @@ const system: Actor = { kind: "system" };
 const green: Actor = { kind: "player", cityId: "green" };
 const blue: Actor = { kind: "player", cityId: "blue" };
 
+// Applies an intent that must succeed. Every event it emits must match the
+// catalog (EVT-010).
 function apply(state: IdleState, actor: Actor, intent: Intent): IdleState {
   const result = reduce(state, actor, intent);
   if (!result.ok) throw new Error(`${intent.type}: ${result.error.message}`);
+  for (const event of result.events)
+    expect(catalogProblem(event, "accepted")).toBeNull();
   return result.state;
 }
 
@@ -520,5 +525,27 @@ describe("malformed intents", () => {
         raw({ type: "triggerEvent", payload: { kind: "constructor" } }),
       ),
     ).toBe("BAD_REQUEST");
+  });
+});
+
+describe("trade offers", () => {
+  it("expire after a while and say so in the log", () => {
+    let state = apply(rich(running()), green, {
+      type: "proposeTrade",
+      payload: { to: "blue", give: { wood: 1 }, get: { coins: 1 } },
+    });
+    const offerId = state.offers[0]?.id;
+    const expired: string[] = [];
+    for (let t = 0; t < TRADE.expiresAfterTicks; t++) {
+      const result = reduce(state, system, { type: "tick" });
+      if (!result.ok) throw new Error(result.error.message);
+      for (const event of result.events) {
+        expect(catalogProblem(event, "accepted")).toBeNull();
+        if (event.type === "trade.expired") expired.push(String(event.city));
+      }
+      state = result.state;
+    }
+    expect(state.offers[0]).toMatchObject({ id: offerId, status: "expired" });
+    expect(expired).toEqual(["green"]);
   });
 });
