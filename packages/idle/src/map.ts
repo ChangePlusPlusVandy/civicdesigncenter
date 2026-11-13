@@ -2,6 +2,8 @@
 // two woods, so the rules and their balance carry over; what changes is the
 // layout, the names and the landmarks. A game picks its map when created.
 
+// What a map cell is. Clay and copper deposits give nearby pits and mines a
+// bonus.
 export type TileKind =
   | "grass"
   | "woods"
@@ -11,13 +13,16 @@ export type TileKind =
   // Built-up land nobody can build on (Nashville's downtown).
   | "downtown";
 
+// The shared resources every map has: one river and two woods.
 export type CommonsId = "river" | "westWoods" | "eastWoods";
 
 // City slots. Each map gives every slot its own name.
 export type CityId = "red" | "green" | "pink" | "blue" | "yellow";
 
+// The maps a teacher can pick.
 export type MapId = "classic" | "nashville";
 
+// A rectangle of cells, in grid coordinates.
 export interface Plot {
   x: number;
   y: number;
@@ -25,6 +30,7 @@ export interface Plot {
   height: number;
 }
 
+// A city slot on one map: its name, colour, land and town hall.
 export interface CityInfo {
   id: CityId;
   name: string;
@@ -33,6 +39,7 @@ export interface CityInfo {
   hall: { x: number; y: number };
 }
 
+// One map cell. Water and woods cells belong to a commons.
 export interface Tile {
   x: number;
   y: number;
@@ -50,6 +57,7 @@ export interface Landmark {
   label?: string;
 }
 
+// A map's layout plus the lookups the rules and the 3D view share.
 export interface GameMap {
   id: MapId;
   name: string;
@@ -70,6 +78,7 @@ export interface GameMap {
   citiesBordering(commons: CommonsId): CityId[];
 }
 
+// The grid size, in cells. The same for every map.
 export const MAP_WIDTH = 16;
 export const MAP_HEIGHT = 16;
 
@@ -91,6 +100,7 @@ const COLORS: Record<CityId, string> = {
   yellow: "#e2ad2c",
 };
 
+// Every city slot, in map order.
 export const CITY_IDS = Object.keys(COLORS) as CityId[];
 
 interface MapSpec {
@@ -333,17 +343,21 @@ const NASHVILLE = defineMap({
   ],
 });
 
+// Every map, by id.
 export const MAPS: Record<MapId, GameMap> = {
   classic: CLASSIC,
   nashville: NASHVILLE,
 };
 
+// Every map id, for validating requests.
 export const MAP_IDS = Object.keys(MAPS) as MapId[];
 
+// The map with this id, or the classic map for an unknown id.
 export function getMap(id: string | undefined): GameMap {
   return MAPS[id as MapId] ?? CLASSIC;
 }
 
+// Names of tile kinds, shown when a student taps a cell.
 export const TILE_NAMES: Record<TileKind, string> = {
   grass: "Open land",
   woods: "Woods",

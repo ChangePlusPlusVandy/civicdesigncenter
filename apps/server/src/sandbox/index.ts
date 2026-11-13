@@ -33,6 +33,7 @@ const SAVE_BATCH = 1000;
 // The largest real message is a reflection of a few hundred characters.
 const MAX_MESSAGE_BYTES = 16 * 1024;
 
+// Settings for a sandbox server. Tests set tickMs to 0 and tick by hand.
 export interface SandboxOptions {
   tickMs?: number;
   // Where games are saved. Defaults to memory (nothing survives a restart).
@@ -44,6 +45,8 @@ interface SocketData {
   identity: Identity;
 }
 
+// Every sandbox game on this server: creates, finds and saves rooms, serves the
+// REST API (router) and the Socket.IO namespace (attach).
 export class Sandbox {
   readonly rooms = new Map<string, GameRoom>();
   private io: SocketServer | undefined;
@@ -103,6 +106,8 @@ export class Sandbox {
     return this.saving;
   }
 
+  // Starts a new game in the lobby with a fresh join code and returns its room.
+  // Sweeps out idle rooms first.
   create(cityCount?: number, mapId?: MapId): GameRoom {
     this.sweep();
     let code = "";
@@ -122,6 +127,8 @@ export class Sandbox {
     return room;
   }
 
+  // The room for a join code, in any letter case, or undefined if there is
+  // none.
   get(code: unknown): GameRoom | undefined {
     const normalized = normalizeRoomCode(
       typeof code === "string" ? code : undefined,
@@ -149,6 +156,8 @@ export class Sandbox {
     void this.io?.close();
   }
 
+  // REST routes, mounted at /api/sandbox: create, look up and join games, plus
+  // the teacher's log and exports (#48).
   router(): Router {
     const router = express.Router();
 
@@ -281,6 +290,10 @@ export class Sandbox {
     return room?.isTeacher(token) ? room : undefined;
   }
 
+  // Starts Socket.IO on the HTTP server and returns it. Each connection
+  // authenticates with a token (or as the projector), gets its projection and
+  // recent events, then sends actions and admin messages. Every message is
+  // validated before use (ARCH-081).
   attach(server: HttpServer): SocketServer {
     this.io = new SocketServer(server, {
       // The web client is served from the same origin (or proxied by Vite).

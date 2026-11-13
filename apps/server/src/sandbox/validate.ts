@@ -94,11 +94,15 @@ const adminMessage = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("removePlayer"), playerId: id }),
 ]);
 
+// The action message if it matches a known intent and its payload exactly,
+// otherwise null.
 export function parseAction(value: unknown): ActionMessage | null {
   const parsed = actionMessage.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
 
+// The teacher's roster change if it is a known type with valid fields,
+// otherwise null.
 export function parseAdmin(value: unknown): AdminMessage | null {
   const parsed = adminMessage.safeParse(value);
   return parsed.success ? parsed.data : null;

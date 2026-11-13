@@ -65,7 +65,7 @@ Run from the repository root:
 - `npm run build` — build the web client, then the server
 - `npm start` — run the built server (set `NODE_ENV=production` to also serve the client)
 - `npm test` — run all tests (Vitest)
-- `npm run test:e2e` — browser tests with Playwright (run `npx playwright install chromium` once)
+- `npm run test:e2e` — browser tests with Playwright, run locally before pushing; CI doesn't run them (run `npx playwright install chromium` once)
 - `npm run bots -- --create --players 30` — simulate a class against a running server
 - `npm run typecheck` — type-check every workspace
 - `npm run lint` — lint with oxlint

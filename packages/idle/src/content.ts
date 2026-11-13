@@ -4,10 +4,13 @@
 
 import type { TileKind } from "./map.ts";
 
+// The goods cities make, store and trade. Coins are separate.
 export type Good = "food" | "wood" | "clay" | "copper";
 
+// Every good, in display order.
 export const GOODS: readonly Good[] = ["food", "wood", "clay", "copper"];
 
+// How each good is named and what it's for, shown to students.
 export const GOOD_INFO: Record<
   Good,
   { name: string; icon: string; use: string }
@@ -33,6 +36,7 @@ export const GOOD_INFO: Record<
 // Coins plus goods. Used for prices, payments and trade offers.
 export type Bundle = Partial<Record<Good | "coins", number>>;
 
+// Every kind of building, including the town hall each city starts with.
 export type BuildingKind =
   | "hall"
   | "house"
@@ -44,8 +48,11 @@ export type BuildingKind =
   | "clay-pit"
   | "copper-mine";
 
+// The buildings students can place: everything but the town hall.
 export type BuildableKind = Exclude<BuildingKind, "hall">;
 
+// One building kind's rules: cost, workers, output, pollution and where it may
+// go.
 export interface BuildingDef {
   name: string;
   icon: string;
@@ -73,6 +80,7 @@ export interface BuildingDef {
   cleans?: number;
 }
 
+// The rules for every building kind.
 export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   hall: {
     name: "Town Hall",
@@ -179,6 +187,7 @@ export const BUILDINGS: Record<BuildingKind, BuildingDef> = {
   },
 };
 
+// The build menu, in order.
 export const BUILDABLE: readonly BuildableKind[] = [
   "farm",
   "fishing-dock",
@@ -190,6 +199,8 @@ export const BUILDABLE: readonly BuildableKind[] = [
   "park",
 ];
 
+// Buildings go from level 1 to 3. The tables below give each level's
+// multipliers and upgrade costs.
 export const MAX_LEVEL = 3;
 // Index by level - 1.
 export const LEVEL_OUTPUT = [1, 2, 3];
@@ -199,6 +210,7 @@ export const LEVEL_HAPPINESS = [1, 1.5, 2];
 export const UPGRADE_COST_FACTOR = [0, 1.5, 2.5];
 export const UPGRADE_COPPER = [0, 3, 8];
 
+// What every city starts the game with.
 export const START = {
   coins: 60,
   goods: { food: 20, wood: 20, clay: 10, copper: 0 } satisfies Record<
@@ -209,20 +221,30 @@ export const START = {
   happiness: 60,
 };
 
+// The most of any one good a city can hold.
 export const STORAGE_CAP = 150;
+// Food each person eats per tick.
 export const FOOD_PER_PERSON = 0.1;
+// Coins each person pays per tick, scaled by happiness.
 export const TAX_PER_PERSON = 0.25;
 // Growth progress per tick when people are fed, housed and happy enough.
 export const GROWTH_RATE = 0.05;
+// Growth lost per tick while people go hungry.
 export const STARVE_RATE = 0.1;
+// People only move in when happiness is at least this.
 export const GROWTH_MIN_HAPPINESS = 40;
 // How quickly happiness moves toward its target each tick.
 export const HAPPINESS_EASE = 0.1;
+// Share of a city's pollution that clears each tick.
 export const POLLUTION_DECAY = 0.05;
 // Share of a riverside city's pollution that drifts into the river each tick.
 export const RIVER_DRIFT = 0.02;
+// Share of the river's pollution that clears each tick. Doubled by River
+// Protection.
 export const RIVER_DECAY = 0.03;
 
+// The stocks a commons holds (fish, or wood and animals), each with its
+// starting amount, cap and regrowth rate.
 export interface CommonsDef {
   stocks: Record<string, { start: number; cap: number; regrowth: number }>;
 }
@@ -252,6 +274,8 @@ export const COMMONS: Record<"river" | "westWoods" | "eastWoods", CommonsDef> =
 export const COLLAPSED = 0.05;
 export const RECOVERED = 0.2;
 
+// The class market: base prices, the stock it aims for, the fee between buying
+// and selling, and the largest order.
 export const MARKET = {
   base: { food: 2, wood: 2, clay: 3, copper: 8 } satisfies Record<Good, number>,
   target: 100,
@@ -261,8 +285,10 @@ export const MARKET = {
   restock: 0.01,
 };
 
+// Limits on trade offers between cities.
 export const TRADE = { maxOpenPerCity: 5, expiresAfterTicks: 90 };
 
+// The policies a Town Meeting can vote on.
 export type PolicyId =
   | "river-protection"
   | "clean-air"
@@ -270,6 +296,7 @@ export type PolicyId =
   | "park-fund"
   | "free-trade";
 
+// Each policy's name and what it changes, shown when voting.
 export const POLICIES: Record<PolicyId, { name: string; summary: string }> = {
   "river-protection": {
     name: "River Protection",
@@ -296,8 +323,10 @@ export const POLICIES: Record<PolicyId, { name: string; summary: string }> = {
   },
 };
 
+// Events the teacher can set off.
 export type EventKind = "drought" | "festival" | "flood";
 
+// What each event does and how many ticks it lasts.
 export const EVENTS: Record<
   EventKind,
   { name: string; summary: string; ticks: number }
@@ -320,6 +349,7 @@ export const EVENTS: Record<
   },
 };
 
+// Achievements a city can unlock.
 export type GoalId =
   | "first-farm"
   | "ten-people"
@@ -330,6 +360,7 @@ export type GoalId =
   | "happy-city"
   | "clean-city";
 
+// Each goal's name and a hint for reaching it.
 export const GOALS: Record<GoalId, { name: string; hint: string }> = {
   "first-farm": { name: "First Harvest", hint: "Build a farm." },
   "ten-people": { name: "Growing Town", hint: "Reach 10 people." },
@@ -355,7 +386,9 @@ export const GOALS: Record<GoalId, { name: string; hint: string }> = {
 export const HISTORY_EVERY = 5;
 export const HISTORY_LENGTH = 60;
 
+// Longest reflection a student can write, in characters.
 export const REFLECTION_MAX_LENGTH = 400;
+// Most reflections a game keeps; the oldest go first.
 export const MAX_REFLECTIONS = 500;
 
 // Asked on the season report. Rotates by season.
@@ -366,6 +399,8 @@ export const REFLECTION_PROMPTS = [
   "What would you tell a new city to do first, and why?",
 ];
 
+// Game speeds the teacher can pick.
 export const SPEEDS = [1, 2, 4] as const;
 export type Speed = (typeof SPEEDS)[number];
+// Milliseconds per tick at speed ×1.
 export const TICK_MS = 2000;

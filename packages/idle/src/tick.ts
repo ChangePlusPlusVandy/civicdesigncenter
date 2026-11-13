@@ -45,6 +45,10 @@ import type {
 
 const COMMONS_IDS: CommonsId[] = ["river", "westWoods", "eastWoods"];
 
+// One production step for every city: buildings run and draw on the river and
+// woods, people eat and pay taxes, happiness and population move, the commons
+// regrow, and running events wear off. Returns the next state and the events
+// for anything that changed, such as a collapse or a goal reached.
 export function runTick(state: IdleState): ReduceResult {
   const map = mapOf(state);
   const events: GameEvent[] = [];

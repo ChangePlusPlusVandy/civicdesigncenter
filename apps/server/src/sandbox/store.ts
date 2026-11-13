@@ -8,6 +8,7 @@ import { PGlite } from "@electric-sql/pglite";
 import pg from "pg";
 import type { CityId, Contribution, IdleState, LoggedEvent } from "@cs/idle";
 
+// A student as saved: a token hash, never the token.
 export interface SavedPlayer {
   id: string;
   // SHA-256 of the player's token; the token itself is never stored.
@@ -16,6 +17,7 @@ export interface SavedPlayer {
   cityId: CityId;
 }
 
+// Everything needed to bring a game back after a restart.
 export interface SavedGame {
   code: string;
   state: IdleState;
@@ -30,6 +32,7 @@ export interface SavedGame {
   seen?: [string, number][];
 }
 
+// Where games and their research logs are saved.
 export interface GameStore {
   init(): Promise<void>;
   // Games touched since `since` (ms since the epoch).
@@ -75,6 +78,8 @@ interface Queryable {
   query<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
+// Saves to Postgres or PGlite, in the sandbox_games and sandbox_events tables.
+// Creating the tables and appending log rows are both safe to repeat.
 export class SqlStore implements GameStore {
   constructor(
     private readonly db: Queryable,
@@ -146,6 +151,8 @@ function parse<T>(value: T | string): T {
   return typeof value === "string" ? (JSON.parse(value) as T) : value;
 }
 
+// Opens Postgres when a database URL is given, otherwise PGlite in a local
+// folder.
 export async function openStore(
   databaseUrl?: string,
   pgliteDir = "./.pglite-sandbox",

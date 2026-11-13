@@ -21,6 +21,7 @@ import {
 import { getMap, type CommonsId, type GameMap } from "./map.ts";
 import type { Building, CityState, IdleState, RuleError } from "./types.ts";
 
+// Rounds to 3 decimals so fractional production adds up the same everywhere.
 export function round3(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
@@ -29,6 +30,7 @@ function level(table: number[], lvl: number): number {
   return table[Math.min(Math.max(lvl, 1), MAX_LEVEL) - 1] ?? 1;
 }
 
+// What it costs to bring a building to the given level, copper included.
 export function upgradeCost(kind: BuildableKind, toLevel: number): Bundle {
   const factor = UPGRADE_COST_FACTOR[toLevel - 1] ?? 0;
   const cost: Bundle = {};
@@ -39,6 +41,7 @@ export function upgradeCost(kind: BuildableKind, toLevel: number): Bundle {
   return cost;
 }
 
+// True if the city has at least everything in the cost.
 export function canAfford(
   city: Pick<CityState, "coins" | "goods">,
   cost: Bundle,
@@ -50,6 +53,8 @@ export function canAfford(
   );
 }
 
+// The coins and goods the city is short of, joined for a message, such as "wood
+// and clay".
 export function missing(
   city: Pick<CityState, "coins" | "goods">,
   cost: Bundle,
@@ -85,6 +90,7 @@ export function applyBundle(
   return { ...city, coins, goods };
 }
 
+// True if the value is a set of non-negative whole amounts of coins and goods.
 export function isBundle(value: unknown): value is Bundle {
   if (typeof value !== "object" || value === null) return false;
   return Object.entries(value).every(
@@ -95,6 +101,7 @@ export function isBundle(value: unknown): value is Bundle {
   );
 }
 
+// True if a bundle asks for nothing.
 export function bundleIsEmpty(bundle: Bundle): boolean {
   return Object.values(bundle).every((amount) => !amount);
 }
@@ -115,6 +122,8 @@ export function hasBonusAt(
   return near ? map.neighborOfKind(x, y, near) !== undefined : false;
 }
 
+// What a building makes and pollutes per tick at its level, before workers and
+// the commons are checked.
 export interface Rates {
   output: Partial<Record<Good, number>>;
   pollution: number;
@@ -202,6 +211,7 @@ export function buildingRates(state: IdleState, building: Building): Rates {
   return { output, pollution, riverPollution, takes, bonusActive };
 }
 
+// How many people the city's homes hold.
 export function housing(city: CityState): number {
   return city.buildings.reduce(
     (sum, building) =>
@@ -214,6 +224,7 @@ export function housing(city: CityState): number {
   );
 }
 
+// How many workers the city's buildings need.
 export function jobs(city: CityState): number {
   return city.buildings.reduce(
     (sum, building) => sum + BUILDINGS[building.kind].workers,
@@ -221,6 +232,7 @@ export function jobs(city: CityState): number {
   );
 }
 
+// Happiness from the city's parks, by level.
 export function parkHappiness(city: CityState): number {
   return city.buildings.reduce(
     (sum, building) =>
@@ -231,6 +243,7 @@ export function parkHappiness(city: CityState): number {
   );
 }
 
+// How much pollution the city's parks clean each tick.
 export function parkCleaning(city: CityState): number {
   return city.buildings.reduce(
     (sum, building) =>
@@ -241,6 +254,7 @@ export function parkCleaning(city: CityState): number {
   );
 }
 
+// One named reason in a city's happiness, such as "Pollution" or "Parks".
 export interface Factor {
   label: string;
   value: number;
@@ -294,6 +308,7 @@ export function happinessFactors(state: IdleState, city: CityState): Factor[] {
   return factors;
 }
 
+// The happiness a city is moving toward: the sum of its factors, from 0 to 100.
 export function targetHappiness(state: IdleState, city: CityState): number {
   const total = happinessFactors(state, city).reduce(
     (sum, factor) => sum + factor.value,
@@ -302,6 +317,8 @@ export function targetHappiness(state: IdleState, city: CityState): number {
   return Math.min(Math.max(total, 0), 100);
 }
 
+// Today's buy and sell prices for a good. Scarce goods cost more; the fee
+// between buy and sell goes away under Free Trade.
 export function marketPrice(
   state: IdleState,
   good: Good,
@@ -316,6 +333,8 @@ export function marketPrice(
   };
 }
 
+// How healthy the river or a woods is, from 0 to 100: how full its stocks are,
+// and for the river how clean it is.
 export function commonsHealth(state: IdleState, id: CommonsId): number {
   const stocks = COMMONS[id].stocks;
   const shares = Object.entries(stocks).map(
@@ -328,6 +347,7 @@ export function commonsHealth(state: IdleState, id: CommonsId): number {
   return Math.round(fullness * clean * 100);
 }
 
+// The average health of the river and both woods, shown on the projector.
 export function regionHealth(state: IdleState): number {
   const ids: CommonsId[] = ["river", "westWoods", "eastWoods"];
   return Math.round(
@@ -342,6 +362,8 @@ export type BuildingCity = Pick<
   "id" | "coins" | "goods" | "buildings"
 >;
 
+// Why a building can't go on this cell (off the map, not the city's land,
+// taken, needs water or woods next to it, or too expensive), or null if it can.
 export function placementProblem(
   map: GameMap,
   city: BuildingCity,

@@ -32,11 +32,13 @@ import type {
   TradeOffer,
 } from "./types.ts";
 
+// Who a projection is for. Decides what it may include (ARCH-024).
 export type Audience =
   | { kind: "player"; cityId: CityId; playerId: string; name: string }
   | { kind: "teacher" }
   | { kind: "projector" };
 
+// What everyone may see about a city: no coins or goods.
 export interface PublicCity {
   id: CityId;
   name: string;
@@ -50,6 +52,7 @@ export interface PublicCity {
   players: string[];
 }
 
+// A city as its own students and the teacher see it.
 export interface PrivateCity extends PublicCity {
   coins: number;
   goods: Record<Good, number>;
@@ -64,6 +67,7 @@ export interface PrivateCity extends PublicCity {
   history: HistoryPoint[];
 }
 
+// The river or a woods as everyone sees it, with its health from 0 to 100.
 export interface CommonsView {
   id: CommonsId;
   name: string;
@@ -73,6 +77,8 @@ export interface CommonsView {
   health: number;
 }
 
+// The Town Meeting in progress: which cities have voted, plus this city's own
+// votes.
 export interface MeetingView {
   policyIds: PolicyId[];
   votedCities: CityId[];
@@ -81,6 +87,7 @@ export interface MeetingView {
   votes?: Partial<Record<CityId, Partial<Record<PolicyId, boolean>>>>;
 }
 
+// One of the projector's ways to win, ranked best first.
 export interface Leaderboard {
   id: "biggest" | "happiest" | "greenest" | "trader";
   title: string;
@@ -98,6 +105,7 @@ export interface Contribution {
   reflections: number;
 }
 
+// A student in the game, for the teacher's roster.
 export interface RosterEntry {
   playerId: string;
   name: string;
@@ -105,6 +113,8 @@ export interface RosterEntry {
   contribution?: Contribution;
 }
 
+// A reflection as its audience may see it: the author's name only for the
+// teacher and teammates.
 export interface ReflectionView {
   id: string;
   season: number;
@@ -114,6 +124,8 @@ export interface ReflectionView {
   author: string | null;
 }
 
+// Everything one audience may see, sent in full after every change (ARCH-021).
+// Clients keep the one with the highest version.
 export interface Projection {
   mapId: MapId;
   version: number;
@@ -224,6 +236,9 @@ function leaderboards(cities: PublicCity[]): Leaderboard[] {
   ];
 }
 
+// Builds the projection of the state for one audience at the given version.
+// Players and the projector never get other cities' coins or goods, or offers
+// between other cities (ARCH-024).
 export function project(
   state: IdleState,
   audience: Audience,

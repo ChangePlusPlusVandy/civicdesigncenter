@@ -53,6 +53,8 @@ import type {
   SeasonSnapshot,
 } from "./types.ts";
 
+// A new game in the lobby on the given map, with 2 to 5 cities (clamped), each
+// starting with its town hall, the starting goods and full commons.
 export function createGame(cityCount = 5, mapId: MapId = "classic"): IdleState {
   const map = getMap(mapId);
   const cityIds = map.cities
@@ -134,6 +136,8 @@ function healthSnapshot(state: IdleState): Record<CommonsId, number> {
   };
 }
 
+// A city's headline numbers, saved at the start of a season so the season
+// report can compare.
 export function snapshot(city: CityState): SeasonSnapshot {
   return {
     population: city.population,
@@ -182,6 +186,10 @@ const PLAYER_INTENTS: Record<PlayerIntent["type"], Phase[]> = {
   reflect: ["running", "paused", "meeting", "ended"],
 };
 
+// Applies one intent from one actor. Returns the next state and the events it
+// caused, or a RuleError with no change. Only the system may tick, teachers run
+// the game, and players act for their own city in the right phase (ARCH-084).
+// Never throws on bad input; the server also validates first (ARCH-081).
 export function reduce(
   state: IdleState,
   actor: Actor,

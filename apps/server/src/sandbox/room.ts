@@ -19,13 +19,16 @@ import {
 } from "@cs/idle";
 import type { SavedGame, SavedPlayer } from "./store.ts";
 
+// A student in a game, as the room keeps them.
 export type Player = SavedPlayer;
 
+// Who a connection is: the teacher, a student, or the read-only projector.
 export type Identity =
   | { kind: "teacher" }
   | { kind: "player"; player: Player }
   | { kind: "projector" };
 
+// How a room starts: a new game, or one restored from the database.
 export interface RoomOptions {
   cityCount?: number;
   mapId?: MapId;
@@ -58,6 +61,7 @@ function emptyContribution(): Contribution {
   };
 }
 
+// SHA-256 of a join token, as hex. Only hashes are stored.
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
@@ -68,6 +72,10 @@ const NAME_PATTERN = /^[\p{L}\p{N} _'-]{2,24}$/u;
 const MAX_LOG = 5000;
 const MAX_SEEN = 2000;
 
+// One game: its state, players, research log and tick timer. Every change goes
+// through act(), admin() or tick(), which apply the rules, log the result
+// (EVT-001, EVT-003) and notify onChange so the server can broadcast new
+// projections (ARCH-021).
 export class GameRoom {
   // Only known right after creating the game; the server keeps just a hash.
   readonly teacherToken: string | null;
@@ -139,6 +147,9 @@ export class GameRoom {
     this.record(events, "system");
   }
 
+  // Adds a student under a unique display name and puts them in the city with
+  // the fewest players. Returns the player and their token, or an error code
+  // and message. Names never go into the log (EVT-008).
   join(
     rawName: string,
   ): { player: Player; token: string } | { error: string; message: string } {
@@ -189,16 +200,21 @@ export class GameRoom {
     return [...counts.entries()].sort((a, b) => a[1] - b[1])[0]?.[0] ?? "red";
   }
 
+  // True if the token is this game's teacher token.
   isTeacher(token: string | undefined): boolean {
     return Boolean(token) && hashToken(token ?? "") === this.teacherTokenHash;
   }
 
+  // The teacher or student a token belongs to, or null if it belongs to nobody.
   authenticate(token: string): Identity | null {
     if (this.isTeacher(token)) return { kind: "teacher" };
     const player = this.players.get(hashToken(token));
     return player ? { kind: "player", player } : null;
   }
 
+  // Runs one validated action through the rules engine and returns the ack. A
+  // repeated clientActionId returns the earlier result instead of running
+  // again. Accepted and rejected attempts are both logged (EVT-001, EVT-003).
   act(identity: Identity, clientActionId: string, intent: ClientIntent): Ack {
     this.lastActivity = Date.now();
     if (identity.kind === "projector") {
@@ -273,6 +289,8 @@ export class GameRoom {
     return reply;
   }
 
+  // Applies a teacher roster change (move or remove a student), logs it and
+  // returns the ack.
   admin(message: AdminMessage): Ack {
     const player = this.playerById(message.playerId);
     if (!player)
@@ -297,6 +315,8 @@ export class GameRoom {
     return { ok: true, version: this.version };
   }
 
+  // Advances the game one production step. Called by the timer while the game
+  // is running.
   tick(): void {
     const result = reduce(this.state, { kind: "system" }, { type: "tick" });
     if (!result.ok) {
@@ -322,16 +342,19 @@ export class GameRoom {
     }
   }
 
+  // Stops the tick timer.
   stop(): void {
     clearInterval(this.timer);
     this.timer = undefined;
     this.timerInterval = 0;
   }
 
+  // The student with this id, or undefined if they were removed.
   playerById(id: string): Player | undefined {
     return [...this.players.values()].find((player) => player.id === id);
   }
 
+  // Every student with their city and what they have done, for the teacher.
   roster(): RosterEntry[] {
     return [...this.players.values()].map((player) => ({
       playerId: player.id,
@@ -356,6 +379,8 @@ export class GameRoom {
     this.contributions.set(participantId, counts);
   }
 
+  // The full state this viewer may see, at the current version (ARCH-021,
+  // ARCH-024).
   projectionFor(identity: Identity): Projection {
     const audience =
       identity.kind === "player"

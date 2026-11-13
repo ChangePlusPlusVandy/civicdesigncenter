@@ -9,7 +9,9 @@ import {
   type RosterEntry,
 } from "@cs/idle";
 
+// The CSV downloads a teacher can ask for.
 export type ExportKind = "activity" | "reflections" | "cities" | "events";
+// Every CSV export, in the order the teacher page lists them.
 export const EXPORT_KINDS: ExportKind[] = [
   "activity",
   "reflections",
@@ -34,6 +36,9 @@ function csv(header: string[], rows: Cell[][]): string {
   );
 }
 
+// Builds one CSV export as text: per-student activity, reflections, each
+// city's stats over time with its latest season report, or the pseudonymous
+// event log (EVT-008). Cells a spreadsheet would run as formulas are defused.
 export function exportCsv(
   kind: ExportKind,
   state: IdleState,
