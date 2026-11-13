@@ -3,13 +3,16 @@ import path from "node:path";
 import express from "express";
 import { ENGINE_VERSION } from "@cs/engine";
 import type { HealthResponse } from "@cs/shared";
+import type { Sandbox } from "./sandbox/index.ts";
 
 type AppOptions = {
   // Built web client to serve (production). Omit in dev, where Vite serves it.
   webDist?: string;
+  // The idle-builder prototype's games (docs/IDLE-PROTOTYPE.md).
+  sandbox?: Sandbox;
 };
 
-export function createApp({ webDist }: AppOptions = {}) {
+export function createApp({ webDist, sandbox }: AppOptions = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json());
@@ -18,6 +21,10 @@ export function createApp({ webDist }: AppOptions = {}) {
     const body: HealthResponse = { ok: true, engineVersion: ENGINE_VERSION };
     res.json(body);
   });
+
+  if (sandbox) {
+    app.use("/api/sandbox", sandbox.router());
+  }
 
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not_found" });
