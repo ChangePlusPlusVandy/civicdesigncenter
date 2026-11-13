@@ -69,7 +69,8 @@ An action is a validated client intent plus the server-supplied `actor` and
 | ---------------------- | ------------------------------------------------ |
 | `UNKNOWN_ACTION`       | Action type has no rule                          |
 | `WRONG_SCENARIO`       | State or log belongs to another scenario or seed |
-| `NOT_ALLOWED`          | Actor kind may not take this action              |
+| `FORBIDDEN`            | Actor kind may not take this action              |
+| `INVALID_TARGET`       | Target is not valid, such as a gift to yourself  |
 | `WRONG_PHASE`          | Action not allowed in the current phase          |
 | `GAME_PAUSED`          | Action not allowed while paused                  |
 | `NOT_PAUSED`           | Action requires a paused game                    |
