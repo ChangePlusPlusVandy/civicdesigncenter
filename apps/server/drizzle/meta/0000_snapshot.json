@@ -1,5 +1,5 @@
 {
-  "id": "0fb3e8fd-2aa9-4993-8162-2ede79da51a2",
+  "id": "725b6add-831c-4650-916c-908ca9b6c12e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -231,7 +231,7 @@
           "columnsTo": [
             "team_id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         },
         "events_team_same_game_fk": {
@@ -447,6 +447,10 @@
         "games_rng_seed_check": {
           "name": "games_rng_seed_check",
           "value": "\"games\".\"rng_seed\" BETWEEN 0 AND 4294967295"
+        },
+        "games_max_size_check": {
+          "name": "games_max_size_check",
+          "value": "\"games\".\"max_size\" IS NULL OR \"games\".\"max_size\" >= 1"
         }
       },
       "isRLSEnabled": false

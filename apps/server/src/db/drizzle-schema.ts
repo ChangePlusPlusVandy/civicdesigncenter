@@ -63,6 +63,10 @@ export const games = pgTable(
   (t) => [
     // EVENTS.md §5.1 RNG values: a uint32, the same seed game.started logs
     check("games_rng_seed_check", sql`${t.rng_seed} BETWEEN 0 AND 4294967295`),
+    check(
+      "games_max_size_check",
+      sql`${t.max_size} IS NULL OR ${t.max_size} >= 1`,
+    ),
   ],
 );
 
@@ -177,9 +181,9 @@ export const events = pgTable(
     actor_type: actorTypeEnum().notNull(),
     participant_id: uuid(), // players.participant_id, null for teacher and system events
     teacher_id: text(), // game_roles.user_id (Better Auth id, not a uuid), null unless actor_type = teacher
-    team_id: integer().references(() => teams.team_id, {
-      onDelete: "set null",
-    }), // null for game-wide events
+    // NO ACTION, not SET NULL: the log is append-only (EVT-001), so a team with events cannot be deleted on its own.
+    //   Deleting the game still cascades, because NO ACTION is checked at the end of the statement
+    team_id: integer().references(() => teams.team_id), // null for game-wide events
     client_action_id: text(), // not unique: one action can produce several events
     version: integer().notNull(), // snapshot version this event produced
     outcome: outcomeEnum().notNull(), // required, no default (EVT-003)
