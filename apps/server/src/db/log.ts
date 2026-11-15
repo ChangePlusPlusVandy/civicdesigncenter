@@ -27,8 +27,8 @@ import {
 // Not in the envelope: seq, version and schema_version are assigned by logEvent when the row is written.
 //
 // Mapping from an engine event (EVENTS.md section 3, EVT-011, ARCH-017):
-//   actor_type        eventActors[type] when it lists the sender's actor.kind (`player` / `teacher`, same names),
-//                     otherwise `system` (round.ended, and game.ended with reason resources_exhausted)
+//   actor_type        the sender's actor.kind (`player` / `teacher`, same names) when eventActors[type] lists it,
+//                     otherwise `system` (round.ended); game.ended follows its reason (EVT-028, EVT-029)
 //   participant_id    actor.participantId on player rows; teacher_id: actor.teacherId on teacher rows
 //   team_id           the acting player's team; for a system event, the team row whose city_key is payload.team
 //   payload           the engine payload unchanged: city ids stay city ids (EVT-011)
@@ -129,6 +129,15 @@ export function parseEvent(input: unknown): LoggedEvent {
       (event.outcome === "applied")
   )
     throw new Error(`${event.type}: payload.applied disagrees with outcome`);
+  // EVT-029: endGame is the teacher's; RULE-090 (resources_exhausted) is the system's
+  if (event.type === "game.ended" && event.outcome === "applied") {
+    const { reason } = payload as EventPayload<"game.ended">;
+    const expected = reason === "teacher" ? "teacher" : "system";
+    if (event.actor_type !== expected)
+      throw new Error(
+        `${event.type}: reason ${reason} needs actor_type ${expected}`,
+      );
+  }
 
   return { ...event, payload };
 }

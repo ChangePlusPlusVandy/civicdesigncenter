@@ -53,7 +53,7 @@ flowchart LR
     SH["@cs/shared"]
     EN["@cs/engine #15"]
     SC["Scenarios JSON #38"]
-    DB[("Postgres: PGlite / Neon<br/>PR #70")]
+    DB[("Postgres: PGlite / Neon<br/>PR #80")]
     EX["Data export CLI #48"]
   end
 

@@ -258,7 +258,7 @@ describe("envelope: who", () => {
     expect(() => parseEvent(event({ team_id: null }))).toThrow(/team_id/);
   });
 
-  // EVENTS.md section 5, Actor column
+  // EVT-028: EVENTS.md section 5, Actor column
   test("an applied event must come from an actor its type allows", () => {
     const teacher = {
       actor_type: "teacher",
@@ -287,6 +287,21 @@ describe("envelope: who", () => {
         }),
       ),
     ).toBeTruthy();
+    // EVT-029: the reason fixes the actor
+    expect(() =>
+      parseEvent(
+        event({
+          ...ended,
+          ...teacher,
+          payload: { reason: "resources_exhausted", at: 1 },
+        }),
+      ),
+    ).toThrow(/needs actor_type system/);
+    expect(() =>
+      parseEvent(
+        event({ ...ended, ...system, payload: { reason: "teacher", at: 1 } }),
+      ),
+    ).toThrow(/needs actor_type teacher/);
   });
 
   test("a rejected attempt from a forbidden actor is still loggable (EVT-003)", () => {
