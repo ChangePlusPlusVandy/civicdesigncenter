@@ -22,7 +22,7 @@ examples from `lc2-default`, not engine constants.
 | ----------------------------------- | ------------------ |
 | Engine contract, RNG, gifts         | In review (PR #73) |
 | Lifecycle, permissions, end, replay | In review (PR #74) |
-| Map adjacency and visibility        | Planned (#20)      |
+| Map adjacency and visibility        | Implemented (#20)  |
 | Auction                             | Planned (#22)      |
 | Production                          | Planned (#23)      |
 | City stats and nature               | Planned (#29)      |
@@ -125,7 +125,7 @@ The running phases are `auction`, `build` and `resolve`.
   buildings only on empty tiles of its own plot. Plots do not overlap each
   other or a feature.
 - RULE-032: Each city has a rectangular view that contains its plot. A
-  city's projection includes only the tiles in its view (#20). The projector
+  city's projection includes only the tiles in its view (`visibleTiles`). The projector
   and the teacher see the whole map.
 - RULE-033: Features have a `kind` (`woods`, `water`, `clay-deposit`,
   `copper-deposit`), finite `stocks` shared by all cities, and a per-stock
