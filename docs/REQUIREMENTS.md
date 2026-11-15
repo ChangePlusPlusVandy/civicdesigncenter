@@ -46,7 +46,7 @@ Out of scope:
 | REQ-004 | Student view        | `/play/:code`                                                    | `player`            | Deferred (#43, #34, #67)       |
 | REQ-005 | Projector view      | `/projector/:code`                                               | `projector`         | Planned (#37)                  |
 | REQ-006 | Facilitator console | `/teach`, `/teach/:gameId`                                       | `teacher`           | Planned (#36)                  |
-| REQ-007 | Walking skeleton    | `/skeleton`, `/skeleton/city/:code`, `/skeleton/projector/:code` | `team`, `projector` | In review (#19); temporary     |
+| REQ-007 | Walking skeleton    | `/skeleton`, `/skeleton/city/:code`, `/skeleton/projector/:code` | `team`, `projector` | Implemented; temporary         |
 
 ### 3.1 Join (REQ-002)
 

@@ -20,7 +20,7 @@ examples from `lc2-default`, not engine constants.
 
 | Area                                | Status             |
 | ----------------------------------- | ------------------ |
-| Engine contract, RNG, gifts         | In review (PR #73) |
+| Engine contract, RNG, gifts         | Implemented        |
 | Lifecycle, permissions, end, replay | In review (PR #74) |
 | Map adjacency and visibility        | Implemented (#20)  |
 | Auction                             | Planned (#22)      |
@@ -240,7 +240,7 @@ Applied per city after production (LC2 formulas):
 
 ## 10. Gifts
 
-Status: In review (PR #73, PR #74).
+Status: Implemented; phase rules (RULE-100): In review (PR #74).
 
 - RULE-100: A player may gift resources from their city to another city at
   any time while the game is running, in every running phase. Gifts are

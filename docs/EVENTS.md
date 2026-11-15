@@ -101,7 +101,7 @@ scenario or the game state.
 | `building.placed`         | player          | Building placed on a tile                  | `building`, `cell` (`{ x, y }`), `adjacency` (array of `{ building, cell }`, empty when none)                             | `buildingPlace`      | Planned (#20)      |
 | `building.removed`        | player          | Building removed                           | `building`, `cell`                                                                                                        | `removeBuilding`     | Planned (#20)      |
 | `building.toggled`        | player          | Running state changed or attempted         | `building`, `before`, `after`, `applied`                                                                                  | `buildingToggle`     | Planned (#23)      |
-| `trade.gift_sent`         | player          | Gift applied or attempted (running phases) | `fromTeam`, `toTeam` (city ids), `resource`, `amount`, `fromBefore`, `toBefore`                                           | `tradeResource`      | In review (PR #73) |
+| `trade.gift_sent`         | player          | Gift applied or attempted (running phases) | `fromTeam`, `toTeam` (city ids), `resource`, `amount`, `fromBefore`, `toBefore`                                           | `tradeResource`      | Implemented        |
 | `teacher.team_assigned`   | teacher         | Player moved to, from or between teams     | `participant`, `before`, `after` (city ids; null = no team)                                                               | (new)                | Planned (#36)      |
 | `teacher.player_kicked`   | teacher         | Player kicked                              | `participant`, `team` (city id; null = no team)                                                                           | (new)                | Planned (#36)      |
 | `teacher.player_renamed`  | teacher         | Player renamed                             | `participant`                                                                                                             | (new)                | Planned (#36)      |
@@ -215,7 +215,7 @@ city stats factors.
 
 ## 7. Idle-builder sandbox
 
-Status: In review (PR #75). The sandbox prototype
+Status: Implemented. The sandbox prototype
 ([`ARCHITECTURE.md`](ARCHITECTURE.md) §11) logs its own events to
 `sandbox_events`. EVT-001 to EVT-003, EVT-008 and EVT-010 apply to it. Its
 catalog is `packages/idle/src/catalog.ts`; `SCHEMA_VERSION` is 1.
