@@ -149,7 +149,11 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
   `apps/server/src/db/drizzle-schema.ts`; migrations are in
   `apps/server/drizzle/`. Status: In review (PR #80).
 - ARCH-051: The database driver is chosen by `DATABASE_URL`: blank selects
-  PGlite in `apps/server/.pglite/`; otherwise `pg`.
+  PGlite in `apps/server/.pglite/`; otherwise `pg`. The PGlite folder and
+  the repo-root `.env` MUST resolve to the same files whether the server
+  runs from source or from the built bundle (`dist/`), and whatever folder it
+  starts in. Outside a repo checkout (a deployed image) no `.env` is read and
+  PGlite uses the working directory.
 - ARCH-052: The server keeps the latest snapshot per game for rehydration
   (one `snapshots` row per game) and one snapshot per round for research and
   replay (the `round.snapshot` event, EVT-007).
