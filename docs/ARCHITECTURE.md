@@ -50,7 +50,12 @@ One server instance hosts all games.
 ## 4. Action pipeline
 
 The server is authoritative. Clients send intents; only the server
-changes state. Status: Planned (#17, #19, #25).
+changes state. Status: In review (#19) for validation, `reduce`, the
+event and snapshot transaction, broadcast and ack
+(`apps/server/src/game/pipeline.ts`); Planned (#25) for the per-game mutex
+(ARCH-011), de-duplication (ARCH-012), the conditional snapshot update
+(ARCH-013), logging of `INVALID` and `FORBIDDEN` attempts (ARCH-014),
+`can()` (ARCH-015) and rehydration (ARCH-053).
 
 ```
 client  emit("action", { clientActionId, type, payload }, ack)
@@ -84,6 +89,13 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
   back to `team_id` when writing events (EVT-011).
 - ARCH-016: Acks carry `{ ok: true, version }` or `{ ok: false, code }`. Error
   codes are stable strings.
+- ARCH-018: `clientActionId` is a string of 1–64 characters. A message
+  without one, or with keys beyond `clientActionId`, `type` and `payload`,
+  is `INVALID`.
+- ARCH-019: An action from a projector session, or from a player without a
+  team, is refused with `FORBIDDEN`. The server broadcasts only after the
+  transaction commits; an unexpected server error acks `INTERNAL` and logs
+  only the error's code or name.
 
 ## 5. Real-time synchronization
 
@@ -161,6 +173,14 @@ socket contract (`Audience`, event names, connect error codes) is
 - ARCH-035: On re-join the server MUST disconnect every socket opened with
   the previous token.
 
+- ARCH-036: Until projector sign-in exists (#24), a projector authenticates
+  with `auth: { roomCode, projectorKey }`. The key is the base64url
+  HMAC-SHA256 of `projector:<gameId>:<roomCode>` under `SESSION_SECRET`.
+  The session receives only the `projector` audience and cannot act
+  (ARCH-019). With `NODE_ENV=production` and the `.env.example` value of
+  `SESSION_SECRET`, every projector is refused. Status: In review (#19);
+  temporary.
+
 ### 6.2 Teachers
 
 - ARCH-040: Teachers sign up with an invite code and sign in with email +
@@ -202,18 +222,26 @@ socket contract (`Audience`, event names, connect error codes) is
 
 ## 8. HTTP surface
 
-| Method | Path                       | Purpose                                | Status        |
-| ------ | -------------------------- | -------------------------------------- | ------------- |
-| GET    | `/healthz`, `/api/healthz` | `{ ok: true, engineVersion }`          | Implemented   |
-| POST   | `/api/games/:code/join`    | Player join and re-join                | Planned (#24) |
-| *      | `/api/auth/*`              | Better Auth                            | Planned (#24) |
-| GET    | any other non-API path     | SPA `index.html` fallback (production) | Implemented   |
+| Method | Path                       | Purpose                                 | Status          |
+| ------ | -------------------------- | --------------------------------------- | --------------- |
+| GET    | `/healthz`, `/api/healthz` | `{ ok: true, engineVersion }`           | Implemented     |
+| POST   | `/api/games/:code/join`    | Player join and re-join                 | Planned (#24)   |
+| POST   | `/api/demo/games`          | Temporary demo game creation (ARCH-063) | In review (#19) |
+| *      | `/api/auth/*`              | Better Auth                             | Planned (#24)   |
+| GET    | any other non-API path     | SPA `index.html` fallback (production)  | Implemented     |
 
 - ARCH-060: Unknown `/api/*` paths return `404 { error: "not_found" }`.
 - ARCH-061: In production the server serves `apps/web/dist` and leaves `/api`
   and `/socket.io` to their handlers.
 - ARCH-062: CORS allows only the server's own origin and the origins in
   `CORS_ORIGINS` (Vercel previews).
+- ARCH-063: Until the facilitator console and player join exist (#24, #36),
+  `POST /api/demo/games` with `Authorization: Bearer <DEMO_SECRET>` creates
+  a game of `lc2-default` in one transaction: one team and one seat per
+  scenario city, and the snapshot at version 0. It returns
+  `{ roomCode, projectorKey, seats: [{ cityId, cityName, token }] }`. A
+  wrong or missing secret returns `401`. The route exists only while
+  `DEMO_SECRET` is set. Status: In review (#19); temporary.
 
 ## 9. Environments
 

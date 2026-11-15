@@ -231,7 +231,7 @@ export class Realtime {
 
 // A failed query's message quotes its parameters, which can include a
 // token hash (ARCH-082), so only the error's code or name is logged.
-function errorKind(error: unknown): string {
+export function errorKind(error: unknown): string {
   const e = error as {
     cause?: { code?: unknown };
     code?: unknown;

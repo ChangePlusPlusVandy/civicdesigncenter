@@ -16,6 +16,15 @@ export type AudienceKind = Audience["kind"];
 // What the client puts in the Socket.IO `auth` payload (ARCH-032).
 export type GameSocketAuth = { token: string };
 
+// TEMPORARY until projector sign-in exists (#24): a projector authenticates
+// with the room code and the game's projector key (ARCH-036). It receives
+// only the `projector` audience and cannot act.
+export type ProjectorSocketAuth = { roomCode: string; projectorKey: string };
+
+// The ack of every `action` message (ARCH-016).
+export type ActionReply =
+  { ok: true; version: number } | { ok: false; code: string };
+
 export const GAME_SOCKET_EVENTS = {
   // server -> client: a full projection with its version (ARCH-021)
   state: "state",
