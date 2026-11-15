@@ -23,6 +23,22 @@ const ProjectorPage = lazy(() =>
 const DebugPage = lazy(() =>
   import("@/pages/DebugPage").then((m) => ({ default: m.DebugPage })),
 );
+// Main-game walking skeleton (#19, REQ-007); temporary, see SkeletonPages.
+const SkeletonHomePage = lazy(() =>
+  import("@/skeleton/SkeletonPages").then((m) => ({
+    default: m.SkeletonHomePage,
+  })),
+);
+const SkeletonCityPage = lazy(() =>
+  import("@/skeleton/SkeletonPages").then((m) => ({
+    default: m.SkeletonCityPage,
+  })),
+);
+const SkeletonProjectorPage = lazy(() =>
+  import("@/skeleton/SkeletonPages").then((m) => ({
+    default: m.SkeletonProjectorPage,
+  })),
+);
 const LabPage = lazy(() =>
   import("@/pages/LabPage").then((m) => ({ default: m.LabPage })),
 );
@@ -39,6 +55,12 @@ function App() {
             <Route path="teach/:code" element={<TeacherConsolePage />} />
             <Route path="projector/:code" element={<ProjectorPage />} />
             <Route path="debug/:code" element={<DebugPage />} />
+            <Route path="skeleton" element={<SkeletonHomePage />} />
+            <Route path="skeleton/city/:code" element={<SkeletonCityPage />} />
+            <Route
+              path="skeleton/projector/:code"
+              element={<SkeletonProjectorPage />}
+            />
             {import.meta.env.DEV ? (
               <Route path="dev/lab" element={<LabPage />} />
             ) : null}

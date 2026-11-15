@@ -18,3 +18,26 @@ export const ActionIntentSchema = z.discriminatedUnion("type", [
 ]);
 export type ActionIntent = z.infer<typeof ActionIntentSchema>;
 export type ActionType = ActionIntent["type"];
+
+// Identifies one client action so a retry can be recognized (ARCH-012).
+export const ClientActionIdSchema = z.string().min(1).max(64);
+
+// What the client emits as `action` (ARCHITECTURE §4): an intent and its
+// `clientActionId` side by side.
+export type ActionMessage = ActionIntent & { clientActionId: string };
+
+// Splits and validates an `action` message (ARCH-081). Returns null when
+// either part is invalid; the server then acks `INVALID`.
+export function parseActionMessage(
+  raw: unknown,
+): { clientActionId: string; intent: ActionIntent } | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return null;
+  }
+  const { clientActionId, ...rest } = raw as Record<string, unknown>;
+  const id = ClientActionIdSchema.safeParse(clientActionId);
+  const intent = ActionIntentSchema.safeParse(rest);
+  return id.success && intent.success
+    ? { clientActionId: id.data, intent: intent.data }
+    : null;
+}
