@@ -56,7 +56,8 @@ CREATE TABLE "games" (
 	"started_at" timestamp with time zone,
 	"ended_at" timestamp with time zone,
 	CONSTRAINT "games_room_code_unique" UNIQUE("room_code"),
-	CONSTRAINT "games_rng_seed_check" CHECK ("games"."rng_seed" BETWEEN 0 AND 4294967295)
+	CONSTRAINT "games_rng_seed_check" CHECK ("games"."rng_seed" BETWEEN 0 AND 4294967295),
+	CONSTRAINT "games_max_size_check" CHECK ("games"."max_size" IS NULL OR "games"."max_size" >= 1)
 );
 --> statement-breakpoint
 CREATE TABLE "players" (
@@ -91,7 +92,7 @@ CREATE TABLE "teams" (
 );
 --> statement-breakpoint
 ALTER TABLE "events" ADD CONSTRAINT "events_game_id_games_game_id_fk" FOREIGN KEY ("game_id") REFERENCES "public"."games"("game_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "events" ADD CONSTRAINT "events_team_id_teams_team_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("team_id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "events" ADD CONSTRAINT "events_team_id_teams_team_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("team_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "events" ADD CONSTRAINT "events_team_same_game_fk" FOREIGN KEY ("team_id","game_id") REFERENCES "public"."teams"("team_id","game_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "game_roles" ADD CONSTRAINT "game_roles_game_id_games_game_id_fk" FOREIGN KEY ("game_id") REFERENCES "public"."games"("game_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "players" ADD CONSTRAINT "players_game_id_games_game_id_fk" FOREIGN KEY ("game_id") REFERENCES "public"."games"("game_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

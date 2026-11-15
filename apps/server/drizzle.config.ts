@@ -2,7 +2,8 @@ import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
 import { fileURLToPath } from "node:url";
 
-config({ path: "../../.env" }); // repo-root .env
+// repo-root .env, resolved from this file so it loads whatever folder drizzle-kit runs from
+config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
 
 const url = process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL;
 // Same folder as src/db/index.ts, so migrations and the server always use one database
