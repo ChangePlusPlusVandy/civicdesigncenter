@@ -7,15 +7,23 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsup",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bots": "tsx scripts/bots.ts"
   },
   "dependencies": {
     "@cs/engine": "*",
+    "@cs/idle": "*",
     "@cs/shared": "*",
-    "express": "^5.3.0"
+    "@electric-sql/pglite": "^0.5.14",
+    "express": "^5.3.0",
+    "pg": "^8.23.1",
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/pg": "^8.23.1",
+    "socket.io-client": "^4.8.4",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15"
   }

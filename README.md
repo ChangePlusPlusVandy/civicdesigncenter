@@ -65,6 +65,8 @@ Run from the repository root:
 - `npm run build` — build the web client, then the server
 - `npm start` — run the built server (set `NODE_ENV=production` to also serve the client)
 - `npm test` — run all tests (Vitest)
+- `npm run test:e2e` — browser tests with Playwright, run locally before pushing; CI doesn't run them (run `npx playwright install chromium` once)
+- `npm run bots -- --create --players 30` — simulate a class against a running server
 - `npm run typecheck` — type-check every workspace
 - `npm run lint` — lint with oxlint
 - `npm run format` / `npm run format:check` — format with Prettier
@@ -80,6 +82,7 @@ The specifications in [`docs/`](docs/README.md) define intended behavior:
 - [Architecture](docs/ARCHITECTURE.md): components, action pipeline, sync, identity, environments
 - [Event log](docs/EVENTS.md): research event envelope and catalog
 - [Interactions](docs/INTERACTIONS.md): component, sequence, screen-flow and phase diagrams
+- [Idle-builder prototype](docs/IDLE-PROTOTYPE.md): design, screens and testing of the idle-builder proposal
 - [Spec guidelines](docs/SPEC-GUIDELINES.md): how the specs are written and maintained
 - [Contributing](CONTRIBUTING.md): workflow and reviews
 
