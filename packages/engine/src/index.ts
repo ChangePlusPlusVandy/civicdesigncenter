@@ -4,6 +4,14 @@
 export const ENGINE_VERSION = "0.0.0";
 
 export { reduce } from "./reduce.ts";
+export { project } from "./project.ts";
+export type {
+  PlayerProjection,
+  ProjectorProjection,
+  Projection,
+  TeacherProjection,
+  TeamProjection,
+} from "./project.ts";
 export { createInitialState } from "./state.ts";
 export { nextFloat, nextInt, nextUint32, pick, seedRng } from "./rng.ts";
 export type { RngState } from "./rng.ts";

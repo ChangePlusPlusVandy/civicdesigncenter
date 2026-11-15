@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { createApp } from "./app.ts";
 import { Sandbox } from "./sandbox/index.ts";
 import { openStore } from "./sandbox/store.ts";
+import { playerTokenAuth, Realtime, snapshotLoader } from "./realtime/index.ts";
 
 // Load the repo-root .env if present (local dev). Deployed environments set real env vars.
 try {
@@ -41,7 +42,15 @@ const sandbox = await Sandbox.open({
 });
 const app = createApp({ webDist: isProduction ? webDist : undefined, sandbox });
 const server = createServer(app);
-sandbox.attach(server);
+// One Socket.IO server: the sandbox on /sandbox, the main game on / (ARCH-020).
+const io = sandbox.attach(server);
+// Opened on first use, so a server that only runs the sandbox never opens the
+// main game's database. Teacher and projector sign-in arrive with #24.
+const getDb = () => import("./db/index.ts").then((m) => m.db);
+export const realtime = new Realtime(io, {
+  authenticate: playerTokenAuth(getDb),
+  loadSnapshot: snapshotLoader(getDb),
+});
 
 server.listen(port, () => {
   console.log(`server listening on http://localhost:${port}`);

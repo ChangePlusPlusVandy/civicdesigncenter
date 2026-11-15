@@ -20,27 +20,27 @@ One server instance hosts all games.
 
 ## 2. Technology stack
 
-| Layer   | Choice                                                                              | Status                                       |
-| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------- |
-| Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`          | Implemented (shell)                          |
-| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                          | Implemented (HTTP only)                      |
-| Engine  | TypeScript package with no I/O                                                      | In review (PR #73, PR #74)                   |
-| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | In review (PR #80)                           |
-| Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped bearer token | Planned (#24)                                |
-| Tests   | Vitest (unit; server integration on in-memory PGlite), Playwright smoke test        | Vitest implemented; Playwright planned (#39) |
-| Hosting | DigitalOcean droplet (Docker + Cloudflare tunnel), Neon Postgres, Vercel previews   | Implemented                                  |
+| Layer   | Choice                                                                              | Status                                        |
+| ------- | ----------------------------------------------------------------------------------- | --------------------------------------------- |
+| Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`          | Implemented (shell)                           |
+| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                          | HTTP: Implemented; Socket.IO: In review (#17) |
+| Engine  | TypeScript package with no I/O                                                      | In review (PR #73, PR #74)                    |
+| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | In review (PR #80)                            |
+| Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped bearer token | Planned (#24)                                 |
+| Tests   | Vitest (unit; server integration on in-memory PGlite), Playwright smoke test        | Vitest implemented; Playwright planned (#39)  |
+| Hosting | DigitalOcean droplet (Docker + Cloudflare tunnel), Neon Postgres, Vercel previews   | Implemented                                   |
 
 ## 3. Repository layout
 
-| Path               | Contents                                                                      | Status                                                           |
-| ------------------ | ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `apps/web/`        | React client                                                                  | Implemented                                                      |
-| `apps/server/`     | Express + Socket.IO server; serves `apps/web/dist` in production              | Implemented (HTTP)                                               |
-| `packages/engine/` | `reduce(scenario, state, action)`, `replay(scenario, seed, events)`           | In review (PR #73, PR #74)                                       |
-| `packages/shared/` | zod schemas and types: actions, socket events, projections, scenario, `can()` | Partial                                                          |
-| `scenarios/`       | Scenario JSON: `lc2-default.json` (engine work), `nashville-v1.json` (MVP)    | `lc2-default`: In review (PR #73); `nashville-v1`: Planned (#38) |
-| `deploy/`          | Droplet runbook and configuration; retired Azure guide                        | Implemented                                                      |
-| `docs/`            | Specifications                                                                | Implemented                                                      |
+| Path               | Contents                                                                                        | Status                                                           |
+| ------------------ | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `apps/web/`        | React client                                                                                    | Implemented                                                      |
+| `apps/server/`     | Express + Socket.IO server; serves `apps/web/dist` in production                                | Implemented (HTTP)                                               |
+| `packages/engine/` | `reduce(scenario, state, action)`, `replay(scenario, seed, events)`, `project(state, audience)` | In review (PR #73, PR #74)                                       |
+| `packages/shared/` | zod schemas and types: actions, socket events, projections, scenario, `can()`                   | Partial                                                          |
+| `scenarios/`       | Scenario JSON: `lc2-default.json` (engine work), `nashville-v1.json` (MVP)                      | `lc2-default`: In review (PR #73); `nashville-v1`: Planned (#38) |
+| `deploy/`          | Droplet runbook and configuration; retired Azure guide                                          | Implemented                                                      |
+| `docs/`            | Specifications                                                                                  | Implemented                                                      |
 
 - ARCH-001: Internal packages export TypeScript source. Vite compiles them for
   the web client; tsup bundles them into the server build.
@@ -87,6 +87,10 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 
 ## 5. Real-time synchronization
 
+Status: In review (#17). The gateway is `apps/server/src/realtime/`; the
+socket contract (`Audience`, event names, connect error codes) is
+`packages/shared/src/socket.ts`.
+
 - ARCH-020: Socket.IO rooms exist per game, per team, per player, and one each
   for the projector and the teacher.
 - ARCH-021: After every accepted action, and on every (re)connect, each
@@ -106,6 +110,32 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 
 - ARCH-024: Sealed bids MUST appear only in the owning team's and the
   teacher's projections until the lot resolves.
+- ARCH-025: The main game uses the default namespace `/`. The server sends
+  `state` with `{ version, state }`, where `state` is the projection; the
+  client sends `action` (§4).
+- ARCH-026: The server MUST authenticate a socket before it joins any room.
+  A refused connection receives a `connect_error` whose message is
+  `UNAUTHORIZED` (missing, unknown, replaced or kicked credentials) or
+  `INTERNAL`.
+- ARCH-027: Every player role receives the `team` audience through its team
+  room. A player without a team receives the `team` projection with
+  `cityId: null` and `city: null` through its player room. The `player`
+  audience is reserved for the per-student trade-only view.
+- ARCH-028: Only the teacher projection contains `seed` and `rng`. Every
+  other projection is built from an allow-list of fields, so new state
+  reaches an audience only when its projection names it.
+- ARCH-029: The `team` projection carries the stocks of the features inside
+  the team's view (RULE-032); the projector and the teacher receive every
+  feature's stocks. Status: Planned (#20); the `team` projection carries no
+  feature stocks until then.
+
+| Room                         | Members                         |
+| ---------------------------- | ------------------------------- |
+| `game:<gameId>`              | Every socket of the game        |
+| `game:<gameId>:team:<id>`    | Players of team `teams.team_id` |
+| `game:<gameId>:player:<pid>` | Sockets of one `participantId`  |
+| `game:<gameId>:projector`    | Projector sockets               |
+| `game:<gameId>:teacher`      | Teacher sockets                 |
 
 ## 6. Identity and access
 
