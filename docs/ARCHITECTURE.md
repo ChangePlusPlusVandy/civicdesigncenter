@@ -20,15 +20,15 @@ One server instance hosts all games.
 
 ## 2. Technology stack
 
-| Layer   | Choice                                                                              | Status                                        |
-| ------- | ----------------------------------------------------------------------------------- | --------------------------------------------- |
-| Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`          | Implemented (shell)                           |
-| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                          | HTTP: Implemented; Socket.IO: In review (#17) |
-| Engine  | TypeScript package with no I/O                                                      | In review (PR #73, PR #74)                    |
-| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | In review (PR #80)                            |
-| Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped bearer token | Planned (#24)                                 |
-| Tests   | Vitest (unit; server integration on in-memory PGlite), Playwright smoke test        | Vitest implemented; Playwright planned (#39)  |
-| Hosting | DigitalOcean droplet (Docker + Cloudflare tunnel), Neon Postgres, Vercel previews   | Implemented                                   |
+| Layer   | Choice                                                                              | Status                                           |
+| ------- | ----------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`          | Implemented (shell)                              |
+| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                          | HTTP: Implemented; Socket.IO: In review (PR #84) |
+| Engine  | TypeScript package with no I/O                                                      | In review (PR #73, PR #74)                       |
+| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | In review (PR #80)                               |
+| Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped bearer token | Planned (#24)                                    |
+| Tests   | Vitest (unit; server integration on in-memory PGlite), Playwright smoke test        | Vitest implemented; Playwright planned (#39)     |
+| Hosting | DigitalOcean droplet (Docker + Cloudflare tunnel), Neon Postgres, Vercel previews   | Implemented                                      |
 
 ## 3. Repository layout
 
@@ -87,7 +87,7 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 
 ## 5. Real-time synchronization
 
-Status: In review (#17). The gateway is `apps/server/src/realtime/`; the
+Status: In review (PR #84). The gateway is `apps/server/src/realtime/`; the
 socket contract (`Audience`, event names, connect error codes) is
 `packages/shared/src/socket.ts`.
 
