@@ -1,5 +1,5 @@
 {
-  "id": "2554cd89-16ec-4a32-9e65-0eeb3961eea1",
+  "id": "0fb3e8fd-2aa9-4993-8162-2ede79da51a2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -86,8 +86,7 @@
           "type": "outcome",
           "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'applied'"
+          "notNull": true
         },
         "error_code": {
           "name": "error_code",
@@ -118,8 +117,7 @@
           "name": "payload",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
+          "notNull": true
         },
         "server_timestamp": {
           "name": "server_timestamp",
@@ -256,6 +254,26 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
+        "events_seq_check": {
+          "name": "events_seq_check",
+          "value": "\"events\".\"seq\" >= 1"
+        },
+        "events_version_check": {
+          "name": "events_version_check",
+          "value": "\"events\".\"version\" >= 0"
+        },
+        "events_round_check": {
+          "name": "events_round_check",
+          "value": "\"events\".\"round\" >= 1"
+        },
+        "events_schema_version_check": {
+          "name": "events_schema_version_check",
+          "value": "\"events\".\"schema_version\" >= 1"
+        },
+        "events_error_code_check": {
+          "name": "events_error_code_check",
+          "value": "(\"events\".\"outcome\" = 'rejected') = (\"events\".\"error_code\" IS NOT NULL)"
+        },
         "events_actor_ids_check": {
           "name": "events_actor_ids_check",
           "value": "\n    (\"events\".\"actor_type\" = 'player'\n      AND \"events\".\"participant_id\" IS NOT NULL AND \"events\".\"teacher_id\" IS NULL)\n    OR (\"events\".\"actor_type\" = 'teacher'\n      AND \"events\".\"teacher_id\" IS NOT NULL AND \"events\".\"participant_id\" IS NULL)\n    OR (\"events\".\"actor_type\" = 'system'\n      AND \"events\".\"participant_id\" IS NULL AND \"events\".\"teacher_id\" IS NULL)\n  "
@@ -364,13 +382,20 @@
           "primaryKey": false,
           "notNull": true
         },
-        "game_status": {
-          "name": "game_status",
-          "type": "game_status",
+        "phase": {
+          "name": "phase",
+          "type": "phase",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
           "default": "'lobby'"
+        },
+        "paused": {
+          "name": "paused",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "max_size": {
           "name": "max_size",
@@ -418,7 +443,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "games_rng_seed_check": {
+          "name": "games_rng_seed_check",
+          "value": "\"games\".\"rng_seed\" BETWEEN 0 AND 4294967295"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.players": {
@@ -469,8 +499,7 @@
         },
         "role": {
           "name": "role",
-          "type": "player_role",
-          "typeSchema": "public",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "'seat'"
@@ -646,7 +675,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "snapshots_version_check": {
+          "name": "snapshots_version_check",
+          "value": "\"snapshots\".\"version\" >= 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.teams": {
@@ -760,15 +794,6 @@
         "system"
       ]
     },
-    "public.game_status": {
-      "name": "game_status",
-      "schema": "public",
-      "values": [
-        "lobby",
-        "active",
-        "ended"
-      ]
-    },
     "public.outcome": {
       "name": "outcome",
       "schema": "public",
@@ -786,13 +811,6 @@
         "build",
         "resolve",
         "ended"
-      ]
-    },
-    "public.player_role": {
-      "name": "player_role",
-      "schema": "public",
-      "values": [
-        "seat"
       ]
     },
     "public.roles": {

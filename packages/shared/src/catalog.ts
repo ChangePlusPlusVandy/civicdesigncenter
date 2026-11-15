@@ -42,7 +42,13 @@ const CityStats = z.object({
   pollution: z.number(),
 });
 
-// The one list of phases. drizzle-schema.ts builds its pgEnum from this, so the catalog and events.phase cannot drift apart
+// EVT-010: version of the payload schemas below. Written to events.schema_version; bump it when a payload
+//   shape changes.
+export const SCHEMA_VERSION = 1;
+
+// Enumerations (docs/EVENTS.md §4). drizzle-schema.ts builds its pgEnums from these lists, so the catalog and the
+//   database cannot drift apart (SPEC-GUIDELINES §9 step 2).
+// Phases match GAME-RULES §3 and the engine's Phase. Pause is the separate `paused` flag, not a phase.
 export const phases = [
   "lobby",
   "auction",
@@ -51,6 +57,19 @@ export const phases = [
   "ended",
 ] as const;
 export const Phase = z.enum(phases);
+
+// actor_type: `player` and `teacher` are the engine's actor.kind values unchanged; `system` marks events the engine
+//   derives during an action (round.ended, production, auction results).
+export const actorTypes = ["player", "teacher", "system"] as const;
+export const ActorType = z.enum(actorTypes);
+export type ActorType = z.infer<typeof ActorType>;
+
+export const outcomes = ["applied", "rejected"] as const;
+export const Outcome = z.enum(outcomes);
+
+// game.ended.reason (GAME-RULES §11) and auction.lot_unsold.reason (RULE-055)
+export const endReasons = ["teacher", "resources_exhausted"] as const;
+export const lotUnsoldReasons = ["tie", "no_bids"] as const;
 
 // NOTE (applies to every payload below): validation checks shape only, not game rules
 //   (e.g. no positive-amount or own-team checks). Rejected attempts carry bad values and must still be loggable.
@@ -122,7 +141,7 @@ export const eventPayloads = {
   "auction.lot_unsold": z.object({
     lot: BuildingId, // related field: buildingId
     tiedTeams: z.array(CityId), // related field: (NEW) - city ids of the tied teams, same type as lot_won.team
-    reason: z.enum(["tie", "no_bids"]), // related field: (NEW)
+    reason: z.enum(lotUnsoldReasons), // related field: (NEW)
     // ADDED / DECISION: "system events with reasons". A lot can also go unsold because nobody bid;
     //   then tiedTeams is [], and without a reason an empty array is ambiguous.
   }),
@@ -272,7 +291,7 @@ export const eventPayloads = {
   //LC2: (NEW) -> game.ended
   // ADDED
   "game.ended": z.object({
-    reason: z.enum(["teacher", "resources_exhausted"]),
+    reason: z.enum(endReasons),
     at: At,
   }),
 
@@ -317,3 +336,35 @@ export const eventTypes = Object.keys(eventPayloads) as [
   EventType,
   ...EventType[],
 ];
+
+// docs/EVENTS.md §5, Actor column: who may be the actor of an applied event of each type. The server sets
+//   actor_type from this, not from who sent the action: when a teacher's advancePhase leaves resolve, the
+//   engine's round.ended is a `system` row and its phase.advanced is a `teacher` row. game.ended is `teacher`
+//   for reason `teacher` and `system` for `resources_exhausted` (RULE-090, RULE-091).
+// Rejected attempts are exempt: a FORBIDDEN attempt is by definition from an actor not listed here.
+export const eventActors: Record<EventType, readonly ActorType[]> = {
+  "game.started": ["teacher"],
+  "game.paused": ["teacher"],
+  "game.resumed": ["teacher"],
+  "game.ended": ["teacher", "system"],
+  "phase.advanced": ["teacher"],
+  "round.ended": ["system"],
+  "round.snapshot": ["system"],
+  "round.city_stats": ["system"],
+  "production.building_ran": ["system"],
+  "auction.lot_added": ["system"],
+  "auction.bid_changed": ["player"],
+  "auction.ready_set": ["player"],
+  "auction.lot_won": ["system"],
+  "auction.lot_unsold": ["system"],
+  "building.placed": ["player"],
+  "building.removed": ["player"],
+  "building.toggled": ["player"],
+  "trade.gift_sent": ["player"],
+  "teacher.team_assigned": ["teacher"],
+  "teacher.player_kicked": ["teacher"],
+  "teacher.player_renamed": ["teacher"],
+  "teacher.team_renamed": ["teacher"],
+  "teacher.seat_reset": ["teacher"],
+  "teacher.room_locked": ["teacher"],
+};

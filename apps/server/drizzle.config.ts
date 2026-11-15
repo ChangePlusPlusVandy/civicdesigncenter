@@ -11,6 +11,9 @@ const base = {
   out: "./drizzle",
   schema: "./src/db/drizzle-schema.ts",
   dialect: "postgresql",
+  // ARCH-091: the idle-builder sandbox creates its own sandbox_* tables in the same database
+  //   (apps/server/src/sandbox/store.ts). Hide them from drizzle-kit so push and studio never drop or alter them.
+  tablesFilter: ["!sandbox_*"] as string[],
 } as const;
 
 export default url

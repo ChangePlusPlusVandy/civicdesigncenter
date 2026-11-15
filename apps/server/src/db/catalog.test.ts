@@ -2,9 +2,21 @@
 // No database except for the seed check, which uses an in-memory PGlite like db.test.ts.
 
 import { test, describe, expect } from "vitest";
-import { eventPayloads, eventTypes, phases } from "@cs/shared/catalog";
+import {
+  actorTypes,
+  eventActors,
+  eventPayloads,
+  eventTypes,
+  outcomes,
+  phases,
+} from "@cs/shared/catalog";
 import { parseEvent } from "./log";
-import { events, phaseEnum } from "./drizzle-schema";
+import {
+  actorTypeEnum,
+  events,
+  outcomeEnum,
+  phaseEnum,
+} from "./drizzle-schema";
 import { createTestDb } from "./helpers";
 import { seed } from "./seed";
 
@@ -72,8 +84,27 @@ describe("catalog", () => {
     expect("trade.notification_read" in eventPayloads).toBe(false);
   });
 
-  test("the database phase enum uses the catalog's phases", () => {
+  // EVENTS.md section 4; SPEC-GUIDELINES section 9 step 2
+  test("the database enums use the catalog's values", () => {
     expect(phaseEnum.enumValues).toEqual([...phases]);
+    expect(actorTypeEnum.enumValues).toEqual([...actorTypes]);
+    expect(outcomeEnum.enumValues).toEqual([...outcomes]);
+  });
+
+  test("enumerations match docs/EVENTS.md section 4", () => {
+    expect([...phases]).toEqual([
+      "lobby",
+      "auction",
+      "build",
+      "resolve",
+      "ended",
+    ]);
+    expect([...actorTypes]).toEqual(["player", "teacher", "system"]);
+    expect([...outcomes]).toEqual(["applied", "rejected"]);
+  });
+
+  test("every event type has an actor list", () => {
+    expect(Object.keys(eventActors).sort()).toEqual([...eventTypes].sort());
   });
 
   test("a valid event parses", () => {
@@ -222,6 +253,66 @@ describe("envelope: who", () => {
     expect(() => parseEvent(event({ participant_id: null }))).toThrow();
   });
 
+  // EVT-005
+  test("player events need team_id", () => {
+    expect(() => parseEvent(event({ team_id: null }))).toThrow(/team_id/);
+  });
+
+  // EVENTS.md section 5, Actor column
+  test("an applied event must come from an actor its type allows", () => {
+    const teacher = {
+      actor_type: "teacher",
+      participant_id: null,
+      teacher_id: "user_abc",
+      team_id: null,
+    };
+    // round.ended is system even though a teacher's advancePhase produced it
+    const roundEnded = { type: "round.ended", payload: { round: 1 } };
+    expect(() => parseEvent(event({ ...roundEnded, ...teacher }))).toThrow(
+      /actor_type/,
+    );
+    // game.ended: teacher for reason teacher, system for resources_exhausted (RULE-090, RULE-091)
+    const ended = { type: "game.ended", team_id: null };
+    expect(
+      parseEvent(
+        event({ ...ended, ...teacher, payload: { reason: "teacher", at: 1 } }),
+      ),
+    ).toBeTruthy();
+    expect(
+      parseEvent(
+        event({
+          ...ended,
+          ...system,
+          payload: { reason: "resources_exhausted", at: 1 },
+        }),
+      ),
+    ).toBeTruthy();
+  });
+
+  test("a rejected attempt from a forbidden actor is still loggable (EVT-003)", () => {
+    const gift = {
+      type: "trade.gift_sent",
+      actor_type: "teacher",
+      participant_id: null,
+      teacher_id: "user_abc",
+      team_id: null,
+      outcome: "rejected",
+      error_code: "FORBIDDEN",
+      payload: {
+        fromTeam: "red",
+        toTeam: "blue",
+        resource: "lumber",
+        amount: 1,
+        fromBefore: 4,
+        toBefore: 4,
+      },
+    };
+    expect(parseEvent(event(gift)).outcome).toBe("rejected");
+    expect(() =>
+      parseEvent(event({ ...gift, outcome: "applied", error_code: null })),
+    ).toThrow();
+  });
+
   test("system events have no participant_id", () => {
     const roundEnded = {
       type: "round.ended",
@@ -261,7 +352,7 @@ describe("envelope: who", () => {
 });
 
 describe("envelope: rejected attempts", () => {
-  const rejected = { outcome: "rejected", error_code: "INSUFFICIENT_FUNDS" };
+  const rejected = { outcome: "rejected", error_code: "NOT_ENOUGH_RESOURCES" };
 
   test("rejected needs an error_code, applied must not have one", () => {
     expect(() => parseEvent(event({ outcome: "rejected" }))).toThrow();
@@ -355,20 +446,15 @@ describe("system events with reasons", () => {
 });
 
 describe("seed", () => {
-  test("every seeded event payload matches the catalog", async () => {
+  test("every seeded event row passes parseEvent", async () => {
     const db = await createTestDb();
     try {
       await seed(db);
       const rows = await db.select().from(events);
       expect(rows.length).toBeGreaterThan(0);
       for (const row of rows) {
-        expect(
-          row.type in eventPayloads,
-          `unknown type ${row.type}`,
-        ).toBeTruthy();
-        eventPayloads[row.type as keyof typeof eventPayloads].parse(
-          row.payload,
-        );
+        // seq, version and schema_version are row columns, not part of the envelope parseEvent checks
+        expect(parseEvent(row).type).toBe(row.type);
       }
     } finally {
       await db.$client.close();

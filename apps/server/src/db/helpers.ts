@@ -98,10 +98,12 @@ export async function makeEvent(
         game_id,
         seq: next(),
         actor_type: "system",
+        outcome: "applied",
         version: 1,
         round: 1,
         phase: "lobby",
         type: "x",
+        payload: {},
         ...overrides,
       })
       .returning(),

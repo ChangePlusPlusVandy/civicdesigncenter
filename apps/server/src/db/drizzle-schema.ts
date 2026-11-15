@@ -1,6 +1,8 @@
-// Drizzle schema: games, players, teams, game_roles, snapshots (state JSON + version), events
-// Driver chosen by DATABASE_URL: blank = PGlite (./pglite/), otherwise pg
+// Drizzle schema: games, players, teams, game_roles, snapshots (state JSON + version), events (ARCH-050)
+// Driver chosen by DATABASE_URL: blank = PGlite (apps/server/.pglite/), otherwise pg (ARCH-051)
 // Tests run on in-memory PGlite
+// The idle-builder sandbox keeps its own sandbox_* tables outside this schema and these migrations (ARCH-091);
+//   drizzle.config.ts filters them out so drizzle-kit never touches them.
 
 // Dependency of Tables: games -> teams -> players -> game_roles
 // games -> snapshots -> events
@@ -24,46 +26,45 @@ import {
   foreignKey,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
-import { phases } from "@cs/shared/catalog";
+import {
+  actorTypes,
+  outcomes,
+  phases,
+  SCHEMA_VERSION,
+} from "@cs/shared/catalog";
 
-// The values live in the event catalog, so events.phase and the catalog cannot drift apart
+// EVENTS.md §4: the values live in the event catalog, so the database enums and the catalog cannot drift apart
 export const phaseEnum = pgEnum("phase", phases);
-
-//The options for game status can be changed and should be once the game is fully designed
-export const gameStatusEnum = pgEnum("game_status", [
-  "lobby",
-  "active",
-  "ended",
-]);
+export const actorTypeEnum = pgEnum("actor_type", actorTypes);
+export const outcomeEnum = pgEnum("outcome", outcomes);
 
 export const roleEnum = pgEnum("roles", ["owner", "player"]);
 
-// players.role. seat = a regular player in a team seat. Add values here (and generate a migration) as the game design needs them
-export const playerRoleEnum = pgEnum("player_role", ["seat"]);
-
-// Event envelope enums. log.ts reads their values, so the zod envelope and the table cannot drift apart
-export const actorTypeEnum = pgEnum("actor_type", [
-  "player",
-  "teacher",
-  "system",
-]);
-export const outcomeEnum = pgEnum("outcome", ["applied", "rejected"]);
-
 //REQUIRED COLUMNS (cannot be changed): game_id, created_at, started_at, ended_at
 // The other columns can be changed depending on what the game system flow is.
-export const games = pgTable("games", {
-  game_id: integer().generatedByDefaultAsIdentity().primaryKey(),
-  scenario_id: text().notNull(),
-  room_code: varchar({ length: 10 }).notNull().unique(),
-  rng_seed: bigint({ mode: "number" }).notNull(), // uint32, too large for a signed integer column
-  game_status: gameStatusEnum().default("lobby").notNull(),
-  max_size: integer(),
-  locked: boolean().default(false).notNull(),
+export const games = pgTable(
+  "games",
+  {
+    game_id: integer().generatedByDefaultAsIdentity().primaryKey(),
+    scenario_id: text().notNull(),
+    room_code: varchar({ length: 10 }).notNull().unique(),
+    rng_seed: bigint({ mode: "number" }).notNull(), // uint32, too large for a signed integer column
+    // ARCH-053: copies of the latest snapshot's phase and paused flag (GAME-RULES §3), written in the same
+    //   transaction as the snapshot, so boot can find the games to rehydrate without reading every state
+    phase: phaseEnum().default("lobby").notNull(),
+    paused: boolean().default(false).notNull(),
+    max_size: integer(),
+    locked: boolean().default(false).notNull(),
 
-  created_at: timestamp({ withTimezone: true }).defaultNow().notNull(),
-  started_at: timestamp({ withTimezone: true }),
-  ended_at: timestamp({ withTimezone: true }),
-});
+    created_at: timestamp({ withTimezone: true }).defaultNow().notNull(),
+    started_at: timestamp({ withTimezone: true }),
+    ended_at: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    // EVENTS.md §5.1 RNG values: a uint32, the same seed game.started logs
+    check("games_rng_seed_check", sql`${t.rng_seed} BETWEEN 0 AND 4294967295`),
+  ],
+);
 
 //REQUIRED COLUMNS (cannot be changed): team_id, game_id, created_at
 // More columns can be added if there are more features for teams
@@ -103,7 +104,9 @@ export const players = pgTable(
       onDelete: "set null",
     }), // null = no team yet (lobby)
     username: text().notNull(),
-    role: playerRoleEnum().default("seat").notNull(),
+    // ARCH-031: text, so per-player roles can be added without a migration. Every role is allowed every
+    //   player action (ARCH-015); can() in packages/shared is the only reader
+    role: text().default("seat").notNull(),
     token_hash: text().notNull(),
     kicked_at: timestamp({ withTimezone: true }),
     last_seen: timestamp({ withTimezone: true }),
@@ -137,24 +140,29 @@ export const game_roles = pgTable(
 
 //REQUIRED COLUMNS: game_id, version, state, updated_at
 //More columns can be added but is not recommended, this should be easy data to grab and kept minimal
-//One row per game. Update changes the data in this row,  v+=1 for every update
-export const snapshots = pgTable("snapshots", {
-  game_id: integer()
-    .primaryKey()
-    .references(() => games.game_id, { onDelete: "cascade" }),
-  version: integer().default(0).notNull(),
-  state: jsonb().notNull(),
-  updated_at: timestamp({ withTimezone: true }).defaultNow().notNull(),
-});
+//One row per game: the latest state, for rehydration (ARCH-052, ARCH-053). Each accepted action updates it
+//  WHERE version = v and sets version = v + 1 (ARCH-013). The per-round copies are round.snapshot events (EVT-007)
+export const snapshots = pgTable(
+  "snapshots",
+  {
+    game_id: integer()
+      .primaryKey()
+      .references(() => games.game_id, { onDelete: "cascade" }),
+    version: integer().default(0).notNull(),
+    state: jsonb().notNull(), // the engine's GameState, plain JSON
+    updated_at: timestamp({ withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [check("snapshots_version_check", sql`${t.version} >= 0`)],
+);
 
 //REQUIRED COLUMNS: event_id, game_id, participant_id, client_action_id, version,payload,server_timestamp
 //This table is very delicate in any changes that can be applied. Don't change too much
 //INDEX: game_id => version, participant_id => client_action_id, not unique because it is one to many relationships.
 
-//WHO: participant events set participant_id, teacher events set teacher_id, system events set neither (log.ts checks this)
+//WHO: player events set participant_id, teacher events set teacher_id, system events set neither (log.ts checks this)
 //TEAM: null for game-wide events (phase.advanced, game.*, ...). FK (team_id, game_id) -> teams keeps it inside the event's game
 //SEQ: per-game and gapless, assigned by the server in the same transaction as the insert. UNIQUE: game_id + seq
-//SNAPSHOTS PER ROUND: stored here as round.snapshot rows (see catalog.ts); the snapshots table keeps only the latest state
+//SNAPSHOTS PER ROUND: stored here as round.snapshot rows (EVT-007, ARCH-052); the snapshots table keeps only the latest state
 export const events = pgTable(
   "events",
   {
@@ -165,7 +173,7 @@ export const events = pgTable(
       .notNull()
       .references(() => games.game_id, { onDelete: "cascade" }),
     seq: integer().notNull(), // 1, 2, 3... per game, no gaps
-    schema_version: integer().default(1).notNull(), // bump when a payload shape in catalog.ts changes
+    schema_version: integer().default(SCHEMA_VERSION).notNull(), // EVT-010: catalog version of the payload
     actor_type: actorTypeEnum().notNull(),
     participant_id: uuid(), // players.participant_id, null for teacher and system events
     teacher_id: text(), // game_roles.user_id (Better Auth id, not a uuid), null unless actor_type = teacher
@@ -174,12 +182,12 @@ export const events = pgTable(
     }), // null for game-wide events
     client_action_id: text(), // not unique: one action can produce several events
     version: integer().notNull(), // snapshot version this event produced
-    outcome: outcomeEnum().default("applied").notNull(),
-    error_code: text(), // set only when outcome = rejected
+    outcome: outcomeEnum().notNull(), // required, no default (EVT-003)
+    error_code: text(), // set only when outcome = rejected (EVT-003, ARCH-014)
     round: integer().notNull(),
     phase: phaseEnum().notNull(), // phase in effect when the event was written
     type: text().notNull(),
-    payload: jsonb().default({}).notNull(),
+    payload: jsonb().notNull(), // schema per type in catalog.ts (EVT-010)
     server_timestamp: timestamp({ withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -195,6 +203,17 @@ export const events = pgTable(
       columns: [t.team_id, t.game_id],
       foreignColumns: [teams.team_id, teams.game_id],
     }),
+    // EVENTS.md §3 ranges
+    check("events_seq_check", sql`${t.seq} >= 1`),
+    check("events_version_check", sql`${t.version} >= 0`),
+    check("events_round_check", sql`${t.round} >= 1`),
+    check("events_schema_version_check", sql`${t.schema_version} >= 1`),
+    // EVT-003: rejected rows carry an error_code, applied rows do not
+    check(
+      "events_error_code_check",
+      sql`(${t.outcome} = 'rejected') = (${t.error_code} IS NOT NULL)`,
+    ),
+    // EVT-025: who acted is fixed by actor_type
     check(
       "events_actor_ids_check",
       sql`

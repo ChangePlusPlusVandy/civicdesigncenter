@@ -10,7 +10,11 @@ import {
   beforeEach,
   afterAll,
 } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, getTableName, is } from "drizzle-orm";
+import { PgTable } from "drizzle-orm/pg-core";
+import { SCHEMA_VERSION } from "@cs/shared/catalog";
+import { SqlStore } from "../sandbox/store";
+import * as schema from "./drizzle-schema";
 import {
   games,
   teams,
@@ -62,12 +66,31 @@ describe("migrations", () => {
       expect(tables).toContain(name);
     }
   });
+
+  // ARCH-091: the sandbox shares the database and drivers but keeps its own sandbox_* tables
+  test("coexist with the sandbox tables in one database", async () => {
+    const ours = Object.values(schema)
+      .filter((value) => is(value, PgTable))
+      .map((table) => getTableName(table));
+    expect(ours.length).toBeGreaterThan(0);
+    for (const name of ours) expect(name.startsWith("sandbox_")).toBe(false);
+
+    await new SqlStore(db.$client).init();
+    const result = await db.$client.query<{ table_name: string }>(
+      "select table_name from information_schema.tables where table_schema = 'public'",
+    );
+    const tables = result.rows.map((r) => r.table_name);
+    expect(tables).toEqual(
+      expect.arrayContaining([...ours, "sandbox_games", "sandbox_events"]),
+    );
+  });
 });
 
 describe("games", () => {
-  test("defaults: lobby status, unlocked, created_at set", async () => {
+  test("defaults: lobby phase, not paused, unlocked, created_at set", async () => {
     const game = await makeGame(db);
-    expect(game.game_status).toBe("lobby");
+    expect(game.phase).toBe("lobby");
+    expect(game.paused).toBe(false);
     expect(game.locked).toBe(false);
     expect(game.created_at).toBeInstanceOf(Date);
     expect(game.started_at).toBeNull();
@@ -98,9 +121,25 @@ describe("games", () => {
     expect(game.rng_seed).toBe(0xffffffff);
   });
 
-  test("game_status rejects values outside the enum", async () => {
+  // EVENTS.md section 5.1: seeds are uint32
+  test("rng_seed outside uint32 is rejected", async () => {
+    for (const rng_seed of [-1, 2 ** 32]) {
+      await expectDbError(
+        makeGame(db, { rng_seed }),
+        PG.CHECK,
+        "games_rng_seed_check",
+      );
+    }
+  });
+
+  // GAME-RULES section 3: pause is the paused flag, not a phase
+  test("phase rejects values outside the enum, including paused", async () => {
     await expectDbError(
-      makeGame(db, { game_status: "paused" as any }),
+      makeGame(db, { phase: "paused" as any }),
+      PG.INVALID_ENUM,
+    );
+    await expectDbError(
+      makeGame(db, { phase: "active" as any }),
       PG.INVALID_ENUM,
     );
   });
@@ -183,18 +222,17 @@ describe("players", () => {
     expect(player.team_id).toBeNull();
   });
 
+  // ARCH-031
   test("role defaults to seat", async () => {
     const game = await makeGame(db);
     const player = await makePlayer(db, game.game_id);
     expect(player.role).toBe("seat");
   });
 
-  test("role rejects values outside the enum", async () => {
+  test("role is text, so new roles need no migration", async () => {
     const game = await makeGame(db);
-    await expectDbError(
-      makePlayer(db, game.game_id, { role: "admin" as any }),
-      PG.INVALID_ENUM,
-    );
+    const player = await makePlayer(db, game.game_id, { role: "trader" });
+    expect(player.role).toBe("trader");
   });
 
   test("token_hash is required", async () => {
@@ -278,6 +316,17 @@ describe("snapshots", () => {
     expect(snap?.version).toBe(0);
   });
 
+  test("version cannot be negative", async () => {
+    const game = await makeGame(db);
+    await expectDbError(
+      db
+        .insert(snapshots)
+        .values({ game_id: game.game_id, state: {}, version: -1 }),
+      PG.CHECK,
+      "snapshots_version_check",
+    );
+  });
+
   test("only one snapshot per game", async () => {
     const game = await makeGame(db);
     await db.insert(snapshots).values({ game_id: game.game_id, state: {} });
@@ -318,13 +367,38 @@ describe("events", () => {
     expect(await db.$count(events, eq(events.game_id, game.game_id))).toBe(2);
   });
 
-  test("defaults: payload {}, outcome applied, schema_version 1, server_timestamp set", async () => {
+  test("defaults: schema_version is the catalog's SCHEMA_VERSION (EVT-010), server_timestamp set", async () => {
     const game = await makeGame(db);
     const event = await makeEvent(db, game.game_id);
-    expect(event.payload).toEqual({});
-    expect(event.outcome).toBe("applied");
-    expect(event.schema_version).toBe(1);
+    expect(event.schema_version).toBe(SCHEMA_VERSION);
     expect(event.server_timestamp).toBeInstanceOf(Date);
+  });
+
+  test("outcome and payload are required (no defaults)", async () => {
+    const game = await makeGame(db);
+    await expectDbError(
+      makeEvent(db, game.game_id, { outcome: null as any }),
+      PG.NOT_NULL,
+    );
+    await expectDbError(
+      makeEvent(db, game.game_id, { payload: null as any }),
+      PG.NOT_NULL,
+    );
+  });
+
+  // EVENTS.md section 3: seq >= 1, version >= 0, round >= 1, schema_version >= 1
+  test.each([
+    ["seq", { seq: 0 }, "events_seq_check"],
+    ["version", { version: -1 }, "events_version_check"],
+    ["round", { round: 0 }, "events_round_check"],
+    ["schema_version", { schema_version: 0 }, "events_schema_version_check"],
+  ] as const)("%s out of range is rejected", async (_, overrides, check) => {
+    const game = await makeGame(db);
+    await expectDbError(
+      makeEvent(db, game.game_id, overrides),
+      PG.CHECK,
+      check,
+    );
   });
 
   test("system event with no participant, teacher or team is allowed", async () => {
@@ -348,10 +422,25 @@ describe("events", () => {
     const game = await makeGame(db);
     const event = await makeEvent(db, game.game_id, {
       outcome: "rejected",
-      error_code: "INSUFFICIENT_FUNDS",
+      error_code: "NOT_ENOUGH_RESOURCES",
     });
     expect(event.outcome).toBe("rejected");
-    expect(event.error_code).toBe("INSUFFICIENT_FUNDS");
+    expect(event.error_code).toBe("NOT_ENOUGH_RESOURCES");
+  });
+
+  // EVT-003, ARCH-014
+  test("error_code is set exactly when the event is rejected", async () => {
+    const game = await makeGame(db);
+    await expectDbError(
+      makeEvent(db, game.game_id, { outcome: "rejected" }),
+      PG.CHECK,
+      "events_error_code_check",
+    );
+    await expectDbError(
+      makeEvent(db, game.game_id, { error_code: "FORBIDDEN" }),
+      PG.CHECK,
+      "events_error_code_check",
+    );
   });
 
   test("seq is unique per game", async () => {
@@ -550,7 +639,7 @@ describe("seed", () => {
     expect(await db.$count(players)).toBe(9);
     expect(await db.$count(game_roles)).toBe(3);
     expect(await db.$count(snapshots)).toBe(2);
-    expect(await db.$count(events)).toBe(3);
+    expect(await db.$count(events)).toBe(4);
   });
 });
 
