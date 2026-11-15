@@ -26,4 +26,6 @@ export function normalizeRoomCode(code: string | undefined): string | null {
 }
 
 export * from "./actions.ts";
+export * from "./demo.ts";
 export * from "./scenario.ts";
+export * from "./socket.ts";

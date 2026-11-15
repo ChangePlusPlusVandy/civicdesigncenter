@@ -38,14 +38,15 @@ Out of scope:
 
 ## 3. Interfaces
 
-| ID      | Interface           | Route                      | Audience projection | Status                         |
-| ------- | ------------------- | -------------------------- | ------------------- | ------------------------------ |
-| REQ-001 | Home                | `/`                        | —                   | Implemented                    |
-| REQ-002 | Join                | `/join`                    | —                   | Implemented (mock submit, #24) |
-| REQ-003 | City view           | `/city/:code`              | `team`              | Planned (#32, #33, #35)        |
-| REQ-004 | Student view        | `/play/:code`              | `player`            | Deferred (#43, #34, #67)       |
-| REQ-005 | Projector view      | `/projector/:code`         | `projector`         | Planned (#37)                  |
-| REQ-006 | Facilitator console | `/teach`, `/teach/:gameId` | `teacher`           | Planned (#36)                  |
+| ID      | Interface           | Route                                                            | Audience projection | Status                         |
+| ------- | ------------------- | ---------------------------------------------------------------- | ------------------- | ------------------------------ |
+| REQ-001 | Home                | `/`                                                              | —                   | Implemented                    |
+| REQ-002 | Join                | `/join`                                                          | —                   | Implemented (mock submit, #24) |
+| REQ-003 | City view           | `/city/:code`                                                    | `team`              | Planned (#32, #33, #35)        |
+| REQ-004 | Student view        | `/play/:code`                                                    | `player`            | Deferred (#43, #34, #67)       |
+| REQ-005 | Projector view      | `/projector/:code`                                               | `projector`         | Planned (#37)                  |
+| REQ-006 | Facilitator console | `/teach`, `/teach/:gameId`                                       | `teacher`           | Planned (#36)                  |
+| REQ-007 | Walking skeleton    | `/skeleton`, `/skeleton/city/:code`, `/skeleton/projector/:code` | `team`, `projector` | In review (#19); temporary     |
 
 ### 3.1 Join (REQ-002)
 
@@ -79,6 +80,22 @@ The shared team view. Join lands every player here. It MUST provide:
 - REQ-031: MUST show the room code, round, phase and each city's public stats.
 - REQ-032: MUST NOT show sealed bid amounts or any team-private data.
 - REQ-033: MUST NOT accept input.
+
+### 3.3.1 Walking skeleton (REQ-007)
+
+Temporary main-game screens, removed when REQ-003, REQ-005 and REQ-006 are
+implemented for the main game.
+
+- REQ-034: `/skeleton` MUST create a game through `POST /api/demo/games`
+  (ARCH-063) and list one link per seat and one projector link.
+- REQ-035: Seat and projector links MUST carry their credential in the URL
+  fragment. The page MUST store it in `localStorage` (ARCH-032) and remove
+  it from the address bar.
+- REQ-036: `/skeleton/city/:code` MUST show the team's resources and send a
+  gift of 1 of a chosen resource to a chosen city.
+- REQ-037: `/skeleton/projector/:code` MUST show the room code, round,
+  version and each city's public stats, and MUST NOT accept input
+  (REQ-032, REQ-033).
 
 ### 3.4 Facilitator console (REQ-006)
 

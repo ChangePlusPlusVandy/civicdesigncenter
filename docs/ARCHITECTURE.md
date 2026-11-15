@@ -1,11 +1,11 @@
 # Architecture
 
-| Field         | Value                                                                                         |
-| ------------- | --------------------------------------------------------------------------------------------- |
-| Status        | Active                                                                                        |
-| Applies to    | `apps/web`, `apps/server`, `packages/*`, `deploy/*`                                           |
-| Last reviewed | 2026-11-01                                                                                    |
-| Related       | #14–#19, #24–#26, #64, PR #70, [`INTERACTIONS.md`](INTERACTIONS.md), [`EVENTS.md`](EVENTS.md) |
+| Field         | Value                                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------------- |
+| Status        | Active                                                                                                |
+| Applies to    | `apps/web`, `apps/server`, `packages/*`, `deploy/*`                                                   |
+| Last reviewed | 2026-11-01                                                                                            |
+| Related       | #14–#19, #24–#26, #64, PR #75, PR #80, [`INTERACTIONS.md`](INTERACTIONS.md), [`EVENTS.md`](EVENTS.md) |
 
 ## 1. Scope
 
@@ -20,27 +20,27 @@ One server instance hosts all games.
 
 ## 2. Technology stack
 
-| Layer   | Choice                                                                              | Status                                       |
-| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------- |
-| Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`          | Implemented (shell)                          |
-| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                          | Implemented (HTTP only)                      |
-| Engine  | TypeScript package with no I/O                                                      | In review (PR #73, PR #74)                   |
-| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | In review (PR #70)                           |
-| Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped bearer token | Planned (#24)                                |
-| Tests   | Vitest (unit; server integration on in-memory PGlite), Playwright smoke test        | Vitest implemented; Playwright planned (#39) |
-| Hosting | DigitalOcean droplet (Docker + Cloudflare tunnel), Neon Postgres, Vercel previews   | Implemented                                  |
+| Layer   | Choice                                                                              | Status                                           |
+| ------- | ----------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`          | Implemented (shell)                              |
+| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                          | HTTP: Implemented; Socket.IO: In review (PR #84) |
+| Engine  | TypeScript package with no I/O                                                      | In review (PR #73, PR #74)                       |
+| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | In review (PR #80)                               |
+| Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped bearer token | Planned (#24)                                    |
+| Tests   | Vitest (unit; server integration on in-memory PGlite), Playwright smoke test        | Vitest implemented; Playwright planned (#39)     |
+| Hosting | DigitalOcean droplet (Docker + Cloudflare tunnel), Neon Postgres, Vercel previews   | Implemented                                      |
 
 ## 3. Repository layout
 
-| Path               | Contents                                                                      | Status                                                           |
-| ------------------ | ----------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `apps/web/`        | React client                                                                  | Implemented                                                      |
-| `apps/server/`     | Express + Socket.IO server; serves `apps/web/dist` in production              | Implemented (HTTP)                                               |
-| `packages/engine/` | `reduce(scenario, state, action)`, `replay(scenario, seed, events)`           | In review (PR #73, PR #74)                                       |
-| `packages/shared/` | zod schemas and types: actions, socket events, projections, scenario, `can()` | Partial                                                          |
-| `scenarios/`       | Scenario JSON: `lc2-default.json` (engine work), `nashville-v1.json` (MVP)    | `lc2-default`: In review (PR #73); `nashville-v1`: Planned (#38) |
-| `deploy/`          | Droplet runbook and configuration; retired Azure guide                        | Implemented                                                      |
-| `docs/`            | Specifications                                                                | Implemented                                                      |
+| Path               | Contents                                                                                        | Status                                                           |
+| ------------------ | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `apps/web/`        | React client                                                                                    | Implemented                                                      |
+| `apps/server/`     | Express + Socket.IO server; serves `apps/web/dist` in production                                | Implemented (HTTP)                                               |
+| `packages/engine/` | `reduce(scenario, state, action)`, `replay(scenario, seed, events)`, `project(state, audience)` | In review (PR #73, PR #74)                                       |
+| `packages/shared/` | zod schemas and types: actions, socket events, projections, scenario, `can()`                   | Partial                                                          |
+| `scenarios/`       | Scenario JSON: `lc2-default.json` (engine work), `nashville-v1.json` (MVP)                      | `lc2-default`: In review (PR #73); `nashville-v1`: Planned (#38) |
+| `deploy/`          | Droplet runbook and configuration; retired Azure guide                                          | Implemented                                                      |
+| `docs/`            | Specifications                                                                                  | Implemented                                                      |
 
 - ARCH-001: Internal packages export TypeScript source. Vite compiles them for
   the web client; tsup bundles them into the server build.
@@ -50,7 +50,12 @@ One server instance hosts all games.
 ## 4. Action pipeline
 
 The server is authoritative. Clients send intents; only the server
-changes state. Status: Planned (#17, #19, #25).
+changes state. Status: In review (#19) for validation, `reduce`, the
+event and snapshot transaction, broadcast and ack
+(`apps/server/src/game/pipeline.ts`); Planned (#25) for the per-game mutex
+(ARCH-011), de-duplication (ARCH-012), the conditional snapshot update
+(ARCH-013), logging of `INVALID` and `FORBIDDEN` attempts (ARCH-014),
+`can()` (ARCH-015) and rehydration (ARCH-053).
 
 ```
 client  emit("action", { clientActionId, type, payload }, ack)
@@ -84,8 +89,19 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
   back to `team_id` when writing events (EVT-011).
 - ARCH-016: Acks carry `{ ok: true, version }` or `{ ok: false, code }`. Error
   codes are stable strings.
+- ARCH-018: `clientActionId` is a string of 1–64 characters. A message
+  without one, or with keys beyond `clientActionId`, `type` and `payload`,
+  is `INVALID`.
+- ARCH-019: An action from a projector session, or from a player without a
+  team, is refused with `FORBIDDEN`. The server broadcasts only after the
+  transaction commits; an unexpected server error acks `INTERNAL` and logs
+  only the error's code or name.
 
 ## 5. Real-time synchronization
+
+Status: In review (PR #84). The gateway is `apps/server/src/realtime/`; the
+socket contract (`Audience`, event names, connect error codes) is
+`packages/shared/src/socket.ts`.
 
 - ARCH-020: Socket.IO rooms exist per game, per team, per player, and one each
   for the projector and the teacher.
@@ -106,6 +122,32 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 
 - ARCH-024: Sealed bids MUST appear only in the owning team's and the
   teacher's projections until the lot resolves.
+- ARCH-025: The main game uses the default namespace `/`. The server sends
+  `state` with `{ version, state }`, where `state` is the projection; the
+  client sends `action` (§4).
+- ARCH-026: The server MUST authenticate a socket before it joins any room.
+  A refused connection receives a `connect_error` whose message is
+  `UNAUTHORIZED` (missing, unknown, replaced or kicked credentials) or
+  `INTERNAL`.
+- ARCH-027: Every player role receives the `team` audience through its team
+  room. A player without a team receives the `team` projection with
+  `cityId: null` and `city: null` through its player room. The `player`
+  audience is reserved for the per-student trade-only view.
+- ARCH-028: Only the teacher projection contains `seed` and `rng`. Every
+  other projection is built from an allow-list of fields, so new state
+  reaches an audience only when its projection names it.
+- ARCH-029: The `team` projection carries the stocks of the features inside
+  the team's view (RULE-032); the projector and the teacher receive every
+  feature's stocks. Status: Planned (#20); the `team` projection carries no
+  feature stocks until then.
+
+| Room                         | Members                         |
+| ---------------------------- | ------------------------------- |
+| `game:<gameId>`              | Every socket of the game        |
+| `game:<gameId>:team:<id>`    | Players of team `teams.team_id` |
+| `game:<gameId>:player:<pid>` | Sockets of one `participantId`  |
+| `game:<gameId>:projector`    | Projector sockets               |
+| `game:<gameId>:teacher`      | Teacher sockets                 |
 
 ## 6. Identity and access
 
@@ -131,6 +173,14 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 - ARCH-035: On re-join the server MUST disconnect every socket opened with
   the previous token.
 
+- ARCH-036: Until projector sign-in exists (#24), a projector authenticates
+  with `auth: { roomCode, projectorKey }`. The key is the base64url
+  HMAC-SHA256 of `projector:<gameId>:<roomCode>` under `SESSION_SECRET`.
+  The session receives only the `projector` audience and cannot act
+  (ARCH-019). With `NODE_ENV=production` and the `.env.example` value of
+  `SESSION_SECRET`, every projector is refused. Status: In review (#19);
+  temporary.
+
 ### 6.2 Teachers
 
 - ARCH-040: Teachers sign up with an invite code and sign in with email +
@@ -142,34 +192,56 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 
 ## 7. Persistence
 
-- ARCH-050: Tables: `games`, `teams`, `players` (with `role`, default
+- ARCH-050: Tables: `games`, `teams`, `players` (with `role`, text, default
   `seat`), `game_roles`, `snapshots` (state JSON + `version`), `events`
-  (append-only), plus the Better Auth tables. Status: In review (PR #70).
+  (append-only), plus the Better Auth tables. A team that has events cannot
+  be deleted on its own; deleting its game removes both (EVT-001). The schema is
+  `apps/server/src/db/drizzle-schema.ts`; migrations are in
+  `apps/server/drizzle/`. Status: In review (PR #80).
 - ARCH-051: The database driver is chosen by `DATABASE_URL`: blank selects
-  PGlite in `./.pglite/`; otherwise `pg`.
-- ARCH-052: The server keeps the latest snapshot per game for rehydration and
-  one snapshot per round for research and replay.
+  PGlite in `apps/server/.pglite/`; otherwise `pg`. The PGlite folder and
+  the repo-root `.env` MUST resolve to the same files whether the server
+  runs from source or from the built bundle (`dist/`), and whatever folder it
+  starts in. Outside a repo checkout (a deployed image) no `.env` is read and
+  PGlite uses the working directory.
+- ARCH-052: The server keeps the latest snapshot per game for rehydration
+  (one `snapshots` row per game) and one snapshot per round for research and
+  replay (the `round.snapshot` event, EVT-007).
 - ARCH-053: On boot the server rehydrates every game whose phase is not
   `ended` from its latest snapshot. `replay(scenario, seed, events)`
   (RULE-004) rebuilds the same state from the event log and is the fallback
   and the audit check.
 - ARCH-054: The event log schema and catalog are specified in
   [`EVENTS.md`](EVENTS.md).
+- ARCH-055: `games.phase` and `games.paused` hold the latest snapshot's
+  `phase` and `paused` (GAME-RULES §3). The server MUST update them in the
+  same transaction as the snapshot.
+- ARCH-056: Migrations and `drizzle-kit` manage only the tables in ARCH-050.
+  `drizzle.config.ts` excludes `sandbox_*`, so `drizzle-kit` never alters or
+  drops the sandbox tables (ARCH-091).
 
 ## 8. HTTP surface
 
-| Method | Path                       | Purpose                                | Status        |
-| ------ | -------------------------- | -------------------------------------- | ------------- |
-| GET    | `/healthz`, `/api/healthz` | `{ ok: true, engineVersion }`          | Implemented   |
-| POST   | `/api/games/:code/join`    | Player join and re-join                | Planned (#24) |
-| *      | `/api/auth/*`              | Better Auth                            | Planned (#24) |
-| GET    | any other non-API path     | SPA `index.html` fallback (production) | Implemented   |
+| Method | Path                       | Purpose                                 | Status          |
+| ------ | -------------------------- | --------------------------------------- | --------------- |
+| GET    | `/healthz`, `/api/healthz` | `{ ok: true, engineVersion }`           | Implemented     |
+| POST   | `/api/games/:code/join`    | Player join and re-join                 | Planned (#24)   |
+| POST   | `/api/demo/games`          | Temporary demo game creation (ARCH-063) | In review (#19) |
+| *      | `/api/auth/*`              | Better Auth                             | Planned (#24)   |
+| GET    | any other non-API path     | SPA `index.html` fallback (production)  | Implemented     |
 
 - ARCH-060: Unknown `/api/*` paths return `404 { error: "not_found" }`.
 - ARCH-061: In production the server serves `apps/web/dist` and leaves `/api`
   and `/socket.io` to their handlers.
 - ARCH-062: CORS allows only the server's own origin and the origins in
   `CORS_ORIGINS` (Vercel previews).
+- ARCH-063: Until the facilitator console and player join exist (#24, #36),
+  `POST /api/demo/games` with `Authorization: Bearer <DEMO_SECRET>` creates
+  a game of `lc2-default` in one transaction: one team and one seat per
+  scenario city, and the snapshot at version 0. It returns
+  `{ roomCode, projectorKey, seats: [{ cityId, cityName, token }] }`. A
+  wrong or missing secret returns `401`. The route exists only while
+  `DEMO_SECRET` is set. Status: In review (#19); temporary.
 
 ## 9. Environments
 
@@ -212,3 +284,34 @@ all clients, hard-coded credentials).
 - ARCH-083: Credentials and secrets MUST come from the environment.
 - ARCH-084: Phases and turn order MUST be enforced by the engine on the
   server, never only in the UI.
+
+## 11. Idle-builder sandbox
+
+Status: In review (PR #75). The sandbox is a separate prototype game
+(`packages/idle`, `apps/server/src/sandbox`) that runs beside the main game
+without sharing its engine, tables or routes. The design is in
+[`IDLE-PROTOTYPE.md`](IDLE-PROTOTYPE.md); its events are in
+[`EVENTS.md`](EVENTS.md) §7.
+
+| Part      | Value                                                                                    |
+| --------- | ---------------------------------------------------------------------------------------- |
+| REST      | `/api/sandbox/games`, `/api/sandbox/games/:code`, `…/join`, `…/log`, `…/export/:kind`    |
+| Socket.IO | Namespace `/sandbox`; client events `action`, `admin`; server events `state`, `events`   |
+| Tables    | `sandbox_games` (one snapshot per game), `sandbox_events` (the log)                      |
+| Config    | `DATABASE_URL`, or a PGlite folder in `SANDBOX_PGLITE_DIR` (default `./.pglite-sandbox`) |
+
+- ARCH-090: The sandbox follows the action pipeline rules ARCH-010, ARCH-012,
+  ARCH-021, ARCH-022 and ARCH-081 within its own namespace and tables.
+- ARCH-091: The sandbox MUST NOT read or write the main game's tables, and
+  its tables carry the `sandbox_` prefix.
+- ARCH-092: The server MUST reject any sandbox socket message larger than
+  16 KB.
+- ARCH-093: An error while handling one sandbox message MUST fail only that
+  message, with code `INTERNAL`, and MUST NOT stop the process.
+- ARCH-094: The server MUST remember each participant's recent
+  `clientActionId`s in the saved game, so a retry after a restart is not
+  applied twice.
+- ARCH-095: A failed save MUST keep its unsaved log rows for the next save.
+  Rows are written at most 1,000 per statement.
+- ARCH-096: With `NODE_ENV=production`, the server MUST exit at startup with
+  a message when neither `DATABASE_URL` nor `SANDBOX_PGLITE_DIR` is set.
