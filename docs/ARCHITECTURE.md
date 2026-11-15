@@ -50,12 +50,15 @@ One server instance hosts all games.
 ## 4. Action pipeline
 
 The server is authoritative. Clients send intents; only the server
-changes state. Status: In review (#19) for validation, `reduce`, the
-event and snapshot transaction, broadcast and ack
-(`apps/server/src/game/pipeline.ts`); Planned (#25) for the per-game mutex
+changes state. Status: In review (#25) for the per-game mutex
 (ARCH-011), de-duplication (ARCH-012), the conditional snapshot update
-(ARCH-013), logging of `INVALID` and `FORBIDDEN` attempts (ARCH-014),
-`can()` (ARCH-015) and rehydration (ARCH-053).
+(ARCH-013), `can()` and the logging of its `FORBIDDEN` (ARCH-014,
+ARCH-015) and rehydration (ARCH-053), on top of the validation, `reduce`,
+event and snapshot transaction, broadcast and ack of #19
+(`apps/server/src/game/pipeline.ts`, `apps/server/src/game/active-games.ts`).
+Not implemented: logging of `INVALID` attempts and of the ARCH-019
+refusals (projector, player without a team) required by ARCH-014; the event
+catalog has no type for them.
 
 ```
 client  emit("action", { clientActionId, type, payload }, ack)
@@ -77,13 +80,17 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 - ARCH-012: `clientActionId` MUST be de-duplicated per participant; a retried
   action returns the original result and changes nothing.
 - ARCH-013: The snapshot update MUST be conditional on the expected
-  `version`. A version conflict aborts the transaction.
+  `version`. A version conflict aborts the transaction. The server then
+  reloads the snapshot and runs the action once more on it; a second
+  conflict acks `INTERNAL`. The transaction that logs a rejected action
+  checks the version the same way.
 - ARCH-014: A rejected action (`INVALID`, `FORBIDDEN` or a `RuleError`) MUST
   write exactly one event with `outcome: rejected` and its `error_code`, in
   its own transaction. State and version do not change.
 - ARCH-015: The `can(role, actionType)` table lives in `packages/shared` and
   runs before the engine. Every player role is allowed every player action,
-  including gifts.
+  including gifts. A `players.role` value that is not in the table is
+  allowed no action.
 - ARCH-017: The server MUST translate the team's row id to its scenario city
   id (`teams.city_key`) before calling the engine, and translate city ids
   back to `team_id` when writing events (EVT-011).
@@ -208,9 +215,12 @@ socket contract (`Audience`, event names, connect error codes) is
   (one `snapshots` row per game) and one snapshot per round for research and
   replay (the `round.snapshot` event, EVT-007).
 - ARCH-053: On boot the server rehydrates every game whose phase is not
-  `ended` from its latest snapshot. `replay(scenario, seed, events)`
+  `ended` from its latest snapshot and keeps it in memory; a game created
+  after boot is loaded on first use. `replay(scenario, seed, events)`
   (RULE-004) rebuilds the same state from the event log and is the fallback
-  and the audit check.
+  and the audit check. Status: In review (#25) for the snapshot load;
+  Planned (#21) for unloading ended games; `replay` fallback not
+  implemented.
 - ARCH-054: The event log schema and catalog are specified in
   [`EVENTS.md`](EVENTS.md).
 - ARCH-055: `games.phase` and `games.paused` hold the latest snapshot's

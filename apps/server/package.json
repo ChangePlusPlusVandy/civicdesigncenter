@@ -20,6 +20,7 @@
     "@cs/idle": "*",
     "@cs/shared": "*",
     "@electric-sql/pglite": "^0.5.14",
+    "async-mutex": "^0.5.0",
     "dotenv": "^18.0.9",
     "drizzle-orm": "^0.45.4",
     "express": "^5.3.0",

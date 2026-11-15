@@ -5,10 +5,11 @@ import { Sandbox } from "./sandbox/index.ts";
 import { openStore } from "./sandbox/store.ts";
 import {
   anyOf,
+  errorKind,
   playerTokenAuth,
   Realtime,
-  snapshotLoader,
 } from "./realtime/index.ts";
+import { ActiveGames } from "./game/active-games.ts";
 import { demoRouter } from "./game/demo.ts";
 import { actionPipeline } from "./game/pipeline.ts";
 import { projectorKeyAuth } from "./game/projector.ts";
@@ -48,8 +49,8 @@ const sandbox = await Sandbox.open({
     process.env.SANDBOX_PGLITE_DIR || undefined,
   ),
 });
-// Opened on first use, so a server that only runs the sandbox never opens the
-// main game's database. Teacher sign-in arrives with #24.
+// Opened on first use. Boot opens it to rehydrate games (ARCH-053) except in
+// production without DATABASE_URL. Teacher sign-in arrives with #24.
 const getDb = () => import("./db/index.ts").then((m) => m.db);
 
 // TEMPORARY until #24: projector keys are signed with SESSION_SECRET
@@ -75,6 +76,21 @@ const app = createApp({
   demo,
 });
 const server = createServer(app);
+
+// ARCH-053: the main game's active games live in memory, rehydrated from
+// their snapshots on boot. A production server with no DATABASE_URL has no
+// writable game database, so it skips this and loads games on first use.
+const activeGames = new ActiveGames(getDb);
+if (!isProduction || process.env.DATABASE_URL) {
+  try {
+    const count = await activeGames.rehydrate();
+    console.log(`rehydrated ${count} active game(s)`);
+  } catch (error) {
+    // Not fatal: each game loads from its snapshot on first use instead.
+    console.error("game rehydration failed:", errorKind(error));
+  }
+}
+
 // One Socket.IO server: the sandbox on /sandbox, the main game on / (ARCH-020).
 const io = sandbox.attach(server);
 export const realtime: Realtime = new Realtime(io, {
@@ -82,9 +98,10 @@ export const realtime: Realtime = new Realtime(io, {
     playerTokenAuth(getDb),
     projectorKeyAuth(getDb, projectorSecret),
   ),
-  loadSnapshot: snapshotLoader(getDb),
+  loadSnapshot: activeGames.snapshotLoader(),
   onAction: actionPipeline({
     getDb,
+    games: activeGames,
     broadcast: (gameId, state, version) =>
       realtime.broadcast(gameId, state, version),
   }),
