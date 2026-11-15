@@ -132,6 +132,15 @@ describe("games", () => {
     }
   });
 
+  test("max_size must be at least 1 when set", async () => {
+    await expectDbError(
+      makeGame(db, { max_size: 0 }),
+      PG.CHECK,
+      "games_max_size_check",
+    );
+    expect((await makeGame(db, { max_size: null })).max_size).toBeNull();
+  });
+
   // GAME-RULES section 3: pause is the paused flag, not a phase
   test("phase rejects values outside the enum, including paused", async () => {
     await expectDbError(
@@ -474,18 +483,37 @@ describe("events", () => {
     );
   });
 
-  test("deleting a team keeps its events with team_id = null", async () => {
+  // EVT-001: the log is append-only, so deleting a team must not rewrite its events
+  test("a team with events cannot be deleted on its own", async () => {
     const game = await makeGame(db);
     const team = await makeTeam(db, game.game_id);
     const event = await makeEvent(db, game.game_id, { team_id: team.team_id });
 
-    await db.delete(teams).where(eq(teams.team_id, team.team_id));
+    await expectDbError(
+      db.delete(teams).where(eq(teams.team_id, team.team_id)),
+      PG.FOREIGN_KEY,
+    );
 
     const [after] = await db
       .select()
       .from(events)
       .where(eq(events.event_id, event.event_id));
-    expect(after, "event should still exist").toMatchObject({ team_id: null });
+    expect(after?.team_id).toBe(team.team_id);
+  });
+
+  test("deleting the game still removes its teams and team events", async () => {
+    const game = await makeGame(db);
+    const team = await makeTeam(db, game.game_id);
+    await makeEvent(db, game.game_id, { team_id: team.team_id });
+
+    await db.delete(games).where(eq(games.game_id, game.game_id));
+
+    expect(
+      await db.select().from(events).where(eq(events.game_id, game.game_id)),
+    ).toHaveLength(0);
+    expect(
+      await db.select().from(teams).where(eq(teams.game_id, game.game_id)),
+    ).toHaveLength(0);
   });
 
   test("phase, actor_type and outcome reject values outside their enums", async () => {

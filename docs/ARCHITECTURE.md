@@ -144,7 +144,8 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 
 - ARCH-050: Tables: `games`, `teams`, `players` (with `role`, text, default
   `seat`), `game_roles`, `snapshots` (state JSON + `version`), `events`
-  (append-only), plus the Better Auth tables. The schema is
+  (append-only), plus the Better Auth tables. A team that has events cannot
+  be deleted on its own; deleting its game removes both (EVT-001). The schema is
   `apps/server/src/db/drizzle-schema.ts`; migrations are in
   `apps/server/drizzle/`. Status: In review (PR #80).
 - ARCH-051: The database driver is chosen by `DATABASE_URL`: blank selects
