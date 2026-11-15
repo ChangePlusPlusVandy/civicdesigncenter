@@ -221,5 +221,8 @@ function rejectedAttempt(
         },
       };
     }
+    default:
+      // Only players reach this function, and only gifts are theirs.
+      throw new Error(`no rejected-attempt event for "${intent.type}"`);
   }
 }

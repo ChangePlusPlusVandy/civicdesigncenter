@@ -11,8 +11,9 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import express, { type Router } from "express";
-import { createInitialState } from "@cs/engine";
-import type { DemoGameResponse } from "@cs/shared";
+import { createInitialState, reduce } from "@cs/engine";
+import type { GameState } from "@cs/engine";
+import type { DemoGameResponse, Scenario } from "@cs/shared";
 import { games, players, snapshots, teams } from "../db/drizzle-schema.ts";
 import { hashToken } from "../db/tokens.ts";
 import type { Db } from "../realtime/index.ts";
@@ -49,6 +50,7 @@ export async function createDemoGame(
         scenario_id: scenario.id,
         room_code: randomCode(),
         rng_seed: seed,
+        phase: "auction", // started below, so gifts are allowed
       })
       .returning({ game_id: games.game_id, room_code: games.room_code });
     if (!game) throw new Error("NO_GAME_ROW");
@@ -78,7 +80,7 @@ export async function createDemoGame(
     await tx.insert(snapshots).values({
       game_id: game.game_id,
       version: 0,
-      state: createInitialState(scenario, seed),
+      state: startedState(scenario, seed),
     });
 
     return {
@@ -87,6 +89,19 @@ export async function createDemoGame(
       seats,
     };
   });
+}
+
+// The demo has no facilitator yet, so the game starts running: the lobby
+// does not allow gifts (GAME-RULES §3).
+function startedState(scenario: Scenario, seed: number): GameState {
+  const result = reduce(scenario, createInitialState(scenario, seed), {
+    type: "startGame",
+    payload: {},
+    actor: { kind: "teacher", teacherId: "demo" },
+    at: Date.now(),
+  });
+  if (!result.ok) throw new Error(result.error.code);
+  return result.state;
 }
 
 // Constant-time bearer check; hashing first makes the lengths equal.
