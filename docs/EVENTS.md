@@ -5,7 +5,7 @@
 | Status        | Draft (frozen with the Nashville spec, #27)                                                                                                               |
 | Applies to    | `packages/engine` event types, `events` table, event catalog (`packages/shared/src/catalog.ts`), data export (#48); §7: `packages/idle`, `sandbox_events` |
 | Last reviewed | 2026-11-06                                                                                                                                                |
-| Related       | #48, #64, #65, PR #70, PR #73, PR #74, PR #75, [`ARCHITECTURE.md`](ARCHITECTURE.md) §4, [`GAME-RULES.md`](GAME-RULES.md)                                  |
+| Related       | #48, #64, #65, PR #73, PR #74, PR #75, PR #80, [`ARCHITECTURE.md`](ARCHITECTURE.md) §4, [`GAME-RULES.md`](GAME-RULES.md)                                  |
 
 ## 1. Scope
 
@@ -130,6 +130,11 @@ scenario or the game state.
   are never logged.
 - EVT-027: The catalog validates payload shape only, not game rules, because
   rejected attempts carry invalid values and must still be logged.
+- EVT-028: The catalog lists the actors each type allows (Actor column). The
+  server MUST refuse to write an applied event whose `actor_type` is not
+  listed for its type. Rejected attempts are exempt (EVT-003).
+- EVT-029: `game.ended` has `actor_type: teacher` for reason `teacher` and
+  `actor_type: system` for reason `resources_exhausted`.
 
 ### 5.1 Shared payload shapes
 

@@ -168,7 +168,7 @@ rows and retries them on the next save. On startup, every game touched in the
 last 12 hours comes back; a game that was running comes back paused for the
 teacher to resume. Tokens are stored only as SHA-256 hashes.
 
-The drivers match the main schema PR (#70); the tables are prefixed
+The drivers match the main schema PR (PR #80); the tables are prefixed
 `sandbox_` and created idempotently, so they don't touch that schema or its
 migrations. Folding them into Drizzle later is a table move.
 
@@ -200,7 +200,7 @@ are mounting `/api/sandbox` in `app.ts` and attaching Socket.IO in `index.ts`.
 | `@cs/idle` rules                      | #21 / #22 / #23 engine work: same `reduce()` shape (state + actor + intent → state + events or error) |
 | `sandbox/room.ts`, `sandbox/index.ts` | #17 rooms and projections, #25 action pipeline (dedupe, rejected-action logging)                      |
 | Player join and tokens                | #24 identity (teacher accounts are a placeholder token here)                                          |
-| `sandbox/store.ts` (saving)           | #70 / #16 database: snapshots and the events table, same drivers                                      |
+| `sandbox/store.ts` (saving)           | #16 database (PR #80): snapshots and the events table, same drivers                                   |
 | Economy, policies, Nashville map      | #27 Nashville mechanics spec, #38 nashville-v1                                                        |
 | Exports                               | #48 gameplay data export                                                                              |
 | `useGame`, debug page                 | #26                                                                                                   |

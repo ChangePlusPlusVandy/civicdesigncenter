@@ -5,7 +5,7 @@
 | Status        | Active                                                                                                |
 | Applies to    | `apps/web`, `apps/server`, `packages/*`, `deploy/*`                                                   |
 | Last reviewed | 2026-11-01                                                                                            |
-| Related       | #14–#19, #24–#26, #64, PR #70, PR #75, [`INTERACTIONS.md`](INTERACTIONS.md), [`EVENTS.md`](EVENTS.md) |
+| Related       | #14–#19, #24–#26, #64, PR #75, PR #80, [`INTERACTIONS.md`](INTERACTIONS.md), [`EVENTS.md`](EVENTS.md) |
 
 ## 1. Scope
 
@@ -25,7 +25,7 @@ One server instance hosts all games.
 | Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`          | Implemented (shell)                          |
 | Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                          | Implemented (HTTP only)                      |
 | Engine  | TypeScript package with no I/O                                                      | In review (PR #73, PR #74)                   |
-| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | In review (PR #70)                           |
+| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | In review (PR #80)                           |
 | Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped bearer token | Planned (#24)                                |
 | Tests   | Vitest (unit; server integration on in-memory PGlite), Playwright smoke test        | Vitest implemented; Playwright planned (#39) |
 | Hosting | DigitalOcean droplet (Docker + Cloudflare tunnel), Neon Postgres, Vercel previews   | Implemented                                  |
@@ -142,19 +142,28 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 
 ## 7. Persistence
 
-- ARCH-050: Tables: `games`, `teams`, `players` (with `role`, default
+- ARCH-050: Tables: `games`, `teams`, `players` (with `role`, text, default
   `seat`), `game_roles`, `snapshots` (state JSON + `version`), `events`
-  (append-only), plus the Better Auth tables. Status: In review (PR #70).
+  (append-only), plus the Better Auth tables. The schema is
+  `apps/server/src/db/drizzle-schema.ts`; migrations are in
+  `apps/server/drizzle/`. Status: In review (PR #80).
 - ARCH-051: The database driver is chosen by `DATABASE_URL`: blank selects
-  PGlite in `./.pglite/`; otherwise `pg`.
-- ARCH-052: The server keeps the latest snapshot per game for rehydration and
-  one snapshot per round for research and replay.
+  PGlite in `apps/server/.pglite/`; otherwise `pg`.
+- ARCH-052: The server keeps the latest snapshot per game for rehydration
+  (one `snapshots` row per game) and one snapshot per round for research and
+  replay (the `round.snapshot` event, EVT-007).
 - ARCH-053: On boot the server rehydrates every game whose phase is not
   `ended` from its latest snapshot. `replay(scenario, seed, events)`
   (RULE-004) rebuilds the same state from the event log and is the fallback
   and the audit check.
 - ARCH-054: The event log schema and catalog are specified in
   [`EVENTS.md`](EVENTS.md).
+- ARCH-055: `games.phase` and `games.paused` hold the latest snapshot's
+  `phase` and `paused` (GAME-RULES §3). The server MUST update them in the
+  same transaction as the snapshot.
+- ARCH-056: Migrations and `drizzle-kit` manage only the tables in ARCH-050.
+  `drizzle.config.ts` excludes `sandbox_*`, so `drizzle-kit` never alters or
+  drops the sandbox tables (ARCH-091).
 
 ## 8. HTTP surface
 
