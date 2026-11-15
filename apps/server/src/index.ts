@@ -3,6 +3,15 @@ import { fileURLToPath } from "node:url";
 import { createApp } from "./app.ts";
 import { Sandbox } from "./sandbox/index.ts";
 import { openStore } from "./sandbox/store.ts";
+import {
+  anyOf,
+  playerTokenAuth,
+  Realtime,
+  snapshotLoader,
+} from "./realtime/index.ts";
+import { demoRouter } from "./game/demo.ts";
+import { actionPipeline } from "./game/pipeline.ts";
+import { projectorKeyAuth } from "./game/projector.ts";
 
 // Load the repo-root .env if present (local dev). Deployed environments set real env vars.
 try {
@@ -39,9 +48,47 @@ const sandbox = await Sandbox.open({
     process.env.SANDBOX_PGLITE_DIR || undefined,
   ),
 });
-const app = createApp({ webDist: isProduction ? webDist : undefined, sandbox });
+// Opened on first use, so a server that only runs the sandbox never opens the
+// main game's database. Teacher sign-in arrives with #24.
+const getDb = () => import("./db/index.ts").then((m) => m.db);
+
+// TEMPORARY until #24: projector keys are signed with SESSION_SECRET
+// (ARCH-036), and DEMO_SECRET enables demo game creation (ARCH-063). The
+// example value of SESSION_SECRET is the development default and is refused
+// in production.
+const DEV_SESSION_SECRET = "dev-only-change-me"; // .env.example
+const sessionSecret = process.env.SESSION_SECRET || undefined;
+const projectorSecret = isProduction
+  ? sessionSecret === DEV_SESSION_SECRET
+    ? undefined
+    : sessionSecret
+  : (sessionSecret ?? DEV_SESSION_SECRET);
+const demoSecret = process.env.DEMO_SECRET || undefined;
+const demo =
+  demoSecret && projectorSecret
+    ? demoRouter({ getDb, demoSecret, projectorSecret })
+    : undefined;
+
+const app = createApp({
+  webDist: isProduction ? webDist : undefined,
+  sandbox,
+  demo,
+});
 const server = createServer(app);
-sandbox.attach(server);
+// One Socket.IO server: the sandbox on /sandbox, the main game on / (ARCH-020).
+const io = sandbox.attach(server);
+export const realtime: Realtime = new Realtime(io, {
+  authenticate: anyOf(
+    playerTokenAuth(getDb),
+    projectorKeyAuth(getDb, projectorSecret),
+  ),
+  loadSnapshot: snapshotLoader(getDb),
+  onAction: actionPipeline({
+    getDb,
+    broadcast: (gameId, state, version) =>
+      realtime.broadcast(gameId, state, version),
+  }),
+});
 
 server.listen(port, () => {
   console.log(`server listening on http://localhost:${port}`);
