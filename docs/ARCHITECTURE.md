@@ -23,24 +23,24 @@ One server instance hosts all games.
 | Layer   | Choice                                                                              | Status                                           |
 | ------- | ----------------------------------------------------------------------------------- | ------------------------------------------------ |
 | Web     | React 19, Vite, React Router, Tailwind CSS + shadcn/ui, `socket.io-client`          | Implemented (shell)                              |
-| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                          | HTTP: Implemented; Socket.IO: In review (PR #84) |
-| Engine  | TypeScript package with no I/O                                                      | In review (PR #73, PR #74)                       |
-| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | In review (PR #80)                               |
+| Server  | Node 22, Express 5, Socket.IO 4, zod, pino                                          | HTTP: Implemented; Socket.IO: Implemented        |
+| Engine  | TypeScript package with no I/O                                                      | Core: Implemented; lifecycle: In review (PR #74) |
+| DB      | Postgres via Drizzle ORM: PGlite locally and in CI, Neon in deployed environments   | Implemented                                      |
 | Auth    | Teachers: Better Auth (email + password, Google). Players: game-scoped bearer token | Planned (#24)                                    |
 | Tests   | Vitest (unit; server integration on in-memory PGlite), Playwright smoke test        | Vitest implemented; Playwright planned (#39)     |
 | Hosting | DigitalOcean droplet (Docker + Cloudflare tunnel), Neon Postgres, Vercel previews   | Implemented                                      |
 
 ## 3. Repository layout
 
-| Path               | Contents                                                                                        | Status                                                           |
-| ------------------ | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `apps/web/`        | React client                                                                                    | Implemented                                                      |
-| `apps/server/`     | Express + Socket.IO server; serves `apps/web/dist` in production                                | Implemented (HTTP)                                               |
-| `packages/engine/` | `reduce(scenario, state, action)`, `replay(scenario, seed, events)`, `project(state, audience)` | In review (PR #73, PR #74)                                       |
-| `packages/shared/` | zod schemas and types: actions, socket events, projections, scenario, `can()`                   | Partial                                                          |
-| `scenarios/`       | Scenario JSON: `lc2-default.json` (engine work), `nashville-v1.json` (MVP)                      | `lc2-default`: In review (PR #73); `nashville-v1`: Planned (#38) |
-| `deploy/`          | Droplet runbook and configuration; retired Azure guide                                          | Implemented                                                      |
-| `docs/`            | Specifications                                                                                  | Implemented                                                      |
+| Path               | Contents                                                                                        | Status                                                    |
+| ------------------ | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `apps/web/`        | React client                                                                                    | Implemented                                               |
+| `apps/server/`     | Express + Socket.IO server; serves `apps/web/dist` in production                                | Implemented (HTTP)                                        |
+| `packages/engine/` | `reduce(scenario, state, action)`, `replay(scenario, seed, events)`, `project(state, audience)` | Core: Implemented; lifecycle: In review (PR #74)          |
+| `packages/shared/` | zod schemas and types: actions, socket events, projections, scenario, `can()`                   | Partial                                                   |
+| `scenarios/`       | Scenario JSON: `lc2-default.json` (engine work), `nashville-v1.json` (MVP)                      | `lc2-default`: Implemented; `nashville-v1`: Planned (#38) |
+| `deploy/`          | Droplet runbook and configuration; retired Azure guide                                          | Implemented                                               |
+| `docs/`            | Specifications                                                                                  | Implemented                                               |
 
 - ARCH-001: Internal packages export TypeScript source. Vite compiles them for
   the web client; tsup bundles them into the server build.
@@ -50,12 +50,15 @@ One server instance hosts all games.
 ## 4. Action pipeline
 
 The server is authoritative. Clients send intents; only the server
-changes state. Status: In review (#19) for validation, `reduce`, the
-event and snapshot transaction, broadcast and ack
-(`apps/server/src/game/pipeline.ts`); Planned (#25) for the per-game mutex
+changes state. Status: Implemented for the per-game mutex
 (ARCH-011), de-duplication (ARCH-012), the conditional snapshot update
-(ARCH-013), logging of `INVALID` and `FORBIDDEN` attempts (ARCH-014),
-`can()` (ARCH-015) and rehydration (ARCH-053).
+(ARCH-013), `can()` and the logging of its `FORBIDDEN` (ARCH-014,
+ARCH-015) and rehydration (ARCH-053), on top of the validation, `reduce`,
+event and snapshot transaction, broadcast and ack of #19
+(`apps/server/src/game/pipeline.ts`, `apps/server/src/game/active-games.ts`).
+Not implemented: logging of `INVALID` attempts and of the ARCH-019
+refusals (projector, player without a team) required by ARCH-014; the event
+catalog has no type for them.
 
 ```
 client  emit("action", { clientActionId, type, payload }, ack)
@@ -77,13 +80,17 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 - ARCH-012: `clientActionId` MUST be de-duplicated per participant; a retried
   action returns the original result and changes nothing.
 - ARCH-013: The snapshot update MUST be conditional on the expected
-  `version`. A version conflict aborts the transaction.
+  `version`. A version conflict aborts the transaction. The server then
+  reloads the snapshot and runs the action once more on it; a second
+  conflict acks `INTERNAL`. The transaction that logs a rejected action
+  checks the version the same way.
 - ARCH-014: A rejected action (`INVALID`, `FORBIDDEN` or a `RuleError`) MUST
   write exactly one event with `outcome: rejected` and its `error_code`, in
   its own transaction. State and version do not change.
 - ARCH-015: The `can(role, actionType)` table lives in `packages/shared` and
   runs before the engine. Every player role is allowed every player action,
-  including gifts.
+  including gifts. A `players.role` value that is not in the table is
+  allowed no action.
 - ARCH-017: The server MUST translate the team's row id to its scenario city
   id (`teams.city_key`) before calling the engine, and translate city ids
   back to `team_id` when writing events (EVT-011).
@@ -99,7 +106,7 @@ server  auth middleware        -> session { gameId, teamId?, role } + actor { ki
 
 ## 5. Real-time synchronization
 
-Status: In review (PR #84). The gateway is `apps/server/src/realtime/`; the
+Status: Implemented. The gateway is `apps/server/src/realtime/`; the
 socket contract (`Audience`, event names, connect error codes) is
 `packages/shared/src/socket.ts`.
 
@@ -178,7 +185,7 @@ socket contract (`Audience`, event names, connect error codes) is
   HMAC-SHA256 of `projector:<gameId>:<roomCode>` under `SESSION_SECRET`.
   The session receives only the `projector` audience and cannot act
   (ARCH-019). With `NODE_ENV=production` and the `.env.example` value of
-  `SESSION_SECRET`, every projector is refused. Status: In review (#19);
+  `SESSION_SECRET`, every projector is refused. Status: Implemented;
   temporary.
 
 ### 6.2 Teachers
@@ -197,7 +204,7 @@ socket contract (`Audience`, event names, connect error codes) is
   (append-only), plus the Better Auth tables. A team that has events cannot
   be deleted on its own; deleting its game removes both (EVT-001). The schema is
   `apps/server/src/db/drizzle-schema.ts`; migrations are in
-  `apps/server/drizzle/`. Status: In review (PR #80).
+  `apps/server/drizzle/`. Status: Implemented.
 - ARCH-051: The database driver is chosen by `DATABASE_URL`: blank selects
   PGlite in `apps/server/.pglite/`; otherwise `pg`. The PGlite folder and
   the repo-root `.env` MUST resolve to the same files whether the server
@@ -208,9 +215,12 @@ socket contract (`Audience`, event names, connect error codes) is
   (one `snapshots` row per game) and one snapshot per round for research and
   replay (the `round.snapshot` event, EVT-007).
 - ARCH-053: On boot the server rehydrates every game whose phase is not
-  `ended` from its latest snapshot. `replay(scenario, seed, events)`
+  `ended` from its latest snapshot and keeps it in memory; a game created
+  after boot is loaded on first use. `replay(scenario, seed, events)`
   (RULE-004) rebuilds the same state from the event log and is the fallback
-  and the audit check.
+  and the audit check. Status: Implemented for the snapshot load;
+  Planned (#21) for unloading ended games; `replay` fallback not
+  implemented.
 - ARCH-054: The event log schema and catalog are specified in
   [`EVENTS.md`](EVENTS.md).
 - ARCH-055: `games.phase` and `games.paused` hold the latest snapshot's
@@ -222,13 +232,13 @@ socket contract (`Audience`, event names, connect error codes) is
 
 ## 8. HTTP surface
 
-| Method | Path                       | Purpose                                 | Status          |
-| ------ | -------------------------- | --------------------------------------- | --------------- |
-| GET    | `/healthz`, `/api/healthz` | `{ ok: true, engineVersion }`           | Implemented     |
-| POST   | `/api/games/:code/join`    | Player join and re-join                 | Planned (#24)   |
-| POST   | `/api/demo/games`          | Temporary demo game creation (ARCH-063) | In review (#19) |
-| *      | `/api/auth/*`              | Better Auth                             | Planned (#24)   |
-| GET    | any other non-API path     | SPA `index.html` fallback (production)  | Implemented     |
+| Method | Path                       | Purpose                                 | Status        |
+| ------ | -------------------------- | --------------------------------------- | ------------- |
+| GET    | `/healthz`, `/api/healthz` | `{ ok: true, engineVersion }`           | Implemented   |
+| POST   | `/api/games/:code/join`    | Player join and re-join                 | Planned (#24) |
+| POST   | `/api/demo/games`          | Temporary demo game creation (ARCH-063) | Implemented   |
+| *      | `/api/auth/*`              | Better Auth                             | Planned (#24) |
+| GET    | any other non-API path     | SPA `index.html` fallback (production)  | Implemented   |
 
 - ARCH-060: Unknown `/api/*` paths return `404 { error: "not_found" }`.
 - ARCH-061: In production the server serves `apps/web/dist` and leaves `/api`
@@ -241,7 +251,7 @@ socket contract (`Audience`, event names, connect error codes) is
   scenario city, and the snapshot at version 0. It returns
   `{ roomCode, projectorKey, seats: [{ cityId, cityName, token }] }`. A
   wrong or missing secret returns `401`. The route exists only while
-  `DEMO_SECRET` is set. Status: In review (#19); temporary.
+  `DEMO_SECRET` is set. Status: Implemented; temporary.
 
 ## 9. Environments
 
@@ -287,7 +297,7 @@ all clients, hard-coded credentials).
 
 ## 11. Idle-builder sandbox
 
-Status: In review (PR #75). The sandbox is a separate prototype game
+Status: Implemented. The sandbox is a separate prototype game
 (`packages/idle`, `apps/server/src/sandbox`) that runs beside the main game
 without sharing its engine, tables or routes. The design is in
 [`IDLE-PROTOTYPE.md`](IDLE-PROTOTYPE.md); its events are in
