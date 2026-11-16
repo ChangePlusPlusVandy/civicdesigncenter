@@ -133,6 +133,25 @@ describe("per-game mutex (ARCH-011)", () => {
   });
 });
 
+describe("games.phase and games.paused (ARCH-055)", () => {
+  it("copies the snapshot's phase and paused flag with an accepted action", async () => {
+    const { demo, gameId, send } = await setup();
+    await db
+      .update(games)
+      .set({ phase: "lobby", paused: true })
+      .where(eq(games.game_id, gameId));
+    const red = await sessionOf(demo, "red");
+
+    expect(await send(red, gift("p-1"))).toEqual({ ok: true, version: 1 });
+
+    const [row] = await db
+      .select({ phase: games.phase, paused: games.paused })
+      .from(games)
+      .where(eq(games.game_id, gameId));
+    expect(row).toEqual({ phase: "auction", paused: false });
+  });
+});
+
 describe("conditional snapshot update (ARCH-013)", () => {
   it("retries on the reloaded state when the version moved", async () => {
     const { demo, gameId, activeGames, send } = await setup();
@@ -330,7 +349,7 @@ describe("rehydration (ARCH-053)", () => {
     expect(loaded).toMatchObject({
       gameId,
       scenarioId: "lc2-default",
-      phase: "lobby",
+      phase: "auction",
       version: 0,
     });
   });

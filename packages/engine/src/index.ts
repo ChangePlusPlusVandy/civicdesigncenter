@@ -3,7 +3,11 @@
 
 export const ENGINE_VERSION = "0.0.0";
 
+export { applyEvent } from "./apply.ts";
+export { resourcesExhausted } from "./end.ts";
+export { RULES } from "./permissions.ts";
 export { reduce } from "./reduce.ts";
+export { replay } from "./replay.ts";
 export { project } from "./project.ts";
 export type {
   PlayerProjection,

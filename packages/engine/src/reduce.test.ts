@@ -1,27 +1,8 @@
-import { ScenarioSchema } from "@cs/shared";
 import { describe, expect, it } from "vitest";
-import lc2 from "../../../scenarios/lc2-default.json";
 import { reduce } from "./reduce.ts";
 import { createInitialState } from "./state.ts";
-import type { Action, Actor, GameState } from "./types.ts";
-
-const scenario = ScenarioSchema.parse(lc2);
-const red: Actor = { kind: "player", participantId: "p1", cityId: "red" };
-const AT = 1_700_000_000_000;
-
-function gift(
-  to: string,
-  resource: string,
-  amount: number,
-  actor: Actor = red,
-): Action {
-  return {
-    type: "giftResource",
-    payload: { to, resource, amount },
-    actor,
-    at: AT,
-  };
-}
+import { AT, errorCode, gift, playing, red, scenario } from "./test-helpers.ts";
+import type { Action, GameState } from "./types.ts";
 
 function deepFreeze<T>(value: T): T {
   if (typeof value === "object" && value !== null) {
@@ -29,11 +10,6 @@ function deepFreeze<T>(value: T): T {
     Object.freeze(value);
   }
   return value;
-}
-
-function errorCode(state: GameState, action: Action): string | undefined {
-  const result = reduce(scenario, state, action);
-  return result.ok ? undefined : result.error.code;
 }
 
 describe("createInitialState", () => {
@@ -69,7 +45,7 @@ describe("createInitialState", () => {
 
 describe("reduce: giftResource", () => {
   it("moves resources and reports an event", () => {
-    const state = deepFreeze(createInitialState(scenario, 42));
+    const state = deepFreeze(playing());
     const result = reduce(scenario, state, gift("green", "lumber", 3));
     if (!result.ok) throw new Error(result.error.message);
     expect(result.state.cities.red!.resources.lumber).toBe(1);
@@ -90,7 +66,7 @@ describe("reduce: giftResource", () => {
   });
 
   it("leaves the input state and untouched cities alone", () => {
-    const state = deepFreeze(createInitialState(scenario, 42));
+    const state = deepFreeze(playing());
     const before = JSON.stringify(state);
     const result = reduce(scenario, state, gift("green", "food", 4));
     expect(JSON.stringify(state)).toBe(before);
@@ -100,27 +76,27 @@ describe("reduce: giftResource", () => {
   });
 
   it("allows gifting everything a city holds", () => {
-    const state = createInitialState(scenario, 42);
+    const state = playing();
     const result = reduce(scenario, state, gift("green", "clay", 4));
     expect(result.ok && result.state.cities.red!.resources.clay).toBe(0);
   });
 
   it("rejects gifts larger than the stock", () => {
-    const state = createInitialState(scenario, 42);
+    const state = playing();
     expect(errorCode(state, gift("green", "clay", 5))).toBe(
       "NOT_ENOUGH_RESOURCES",
     );
   });
 
   it("rejects zero, negative and fractional amounts", () => {
-    const state = createInitialState(scenario, 42);
+    const state = playing();
     expect(errorCode(state, gift("green", "clay", 0))).toBe("INVALID_AMOUNT");
     expect(errorCode(state, gift("green", "clay", -1))).toBe("INVALID_AMOUNT");
     expect(errorCode(state, gift("green", "clay", 1.5))).toBe("INVALID_AMOUNT");
   });
 
   it("rejects unknown cities and resources", () => {
-    const state = createInitialState(scenario, 42);
+    const state = playing();
     expect(errorCode(state, gift("purple", "clay", 1))).toBe("UNKNOWN_CITY");
     expect(
       errorCode(
@@ -137,7 +113,7 @@ describe("reduce: giftResource", () => {
   });
 
   it("treats inherited object keys as unknown cities, not a crash", () => {
-    const state = createInitialState(scenario, 42);
+    const state = playing();
     for (const key of [
       "constructor",
       "toString",
@@ -159,7 +135,7 @@ describe("reduce: giftResource", () => {
   });
 
   it("rejects gifts to yourself and gifts from teachers", () => {
-    const state = createInitialState(scenario, 42);
+    const state = playing();
     expect(errorCode(state, gift("red", "clay", 1))).toBe("INVALID_TARGET");
     expect(
       errorCode(
@@ -172,7 +148,7 @@ describe("reduce: giftResource", () => {
 
 describe("reduce", () => {
   it("rejects unknown action types", () => {
-    const state = createInitialState(scenario, 42);
+    const state = playing();
     const bogus = {
       type: "launchRocket",
       payload: {},
@@ -184,7 +160,7 @@ describe("reduce", () => {
 
   it("rejects state from another scenario", () => {
     const state = {
-      ...createInitialState(scenario, 42),
+      ...playing(),
       scenarioId: "nashville-v1",
     };
     expect(errorCode(state, gift("green", "clay", 1))).toBe("WRONG_SCENARIO");
@@ -197,7 +173,7 @@ describe("reduce", () => {
       gift("pink", "clay", 2),
     ];
     const run = (snapshot: boolean) => {
-      let state = createInitialState(scenario, 42);
+      let state = playing();
       for (const action of actions) {
         const result = reduce(scenario, state, action);
         if (!result.ok) throw new Error(`rejected: ${result.error.message}`);

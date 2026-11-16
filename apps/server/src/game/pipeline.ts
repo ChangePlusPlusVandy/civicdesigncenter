@@ -17,7 +17,7 @@ import {
   type ActionIntent,
   type ActionReply,
 } from "@cs/shared";
-import { events, snapshots } from "../db/drizzle-schema.ts";
+import { events, games as gameRows, snapshots } from "../db/drizzle-schema.ts";
 import { parseEvent } from "../db/log.ts";
 import type { ActionHandler, Db, SocketSession } from "../realtime/index.ts";
 import { errorKind } from "../realtime/index.ts";
@@ -210,11 +210,19 @@ async function apply(
         error_code: null,
       })),
     );
-    // TODO(#21): ARCH-055: copy the snapshot's phase and paused flag to
-    //   games.phase and games.paused here, once the engine state has them
-    //   (PR #74).
+    // ARCH-055: games.phase and games.paused mirror the snapshot, in the same
+    // transaction.
+    await tx
+      .update(gameRows)
+      .set({ phase: result.state.phase, paused: result.state.paused })
+      .where(eq(gameRows.game_id, game.gameId));
   });
-  games.set({ ...game, state: result.state, version });
+  games.set({
+    ...game,
+    state: result.state,
+    phase: result.state.phase,
+    version,
+  });
 
   // ARCH-019, ARCH-021: only after the commit. The action is saved, so a
   // failed broadcast is logged and the ack still reports success; clients
@@ -326,5 +334,8 @@ function rejectedAttempt(
         },
       };
     }
+    default:
+      // Only players reach this function, and only gifts are theirs.
+      throw new Error(`no rejected-attempt event for "${intent.type}"`);
   }
 }
